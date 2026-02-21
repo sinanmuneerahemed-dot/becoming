@@ -452,6 +452,10 @@ function getToneSupportInstruction(tone: EmotionalTone): string {
     }
 }
 
+function formatThemeLabel(theme: ProblemTheme): string {
+    return theme.replace(/-/g, " ");
+}
+
 function detectGoalType(aimText: string): GoalType {
     const text = aimText.toLowerCase();
 
@@ -592,39 +596,118 @@ function buildReviewScheduleLines(
     ];
 }
 
-function buildExecutionTasks(aimText: string, dailyTarget: DailyTarget | null, insight: AimInsight): string[] {
+function buildExecutionTasks(
+    aimText: string,
+    dailyTarget: DailyTarget | null,
+    insight: AimInsight,
+    day: number
+): string[] {
     const primaryTheme = insight.themes[0] ?? "productivity";
+    const themeLabel = formatThemeLabel(primaryTheme);
     const strategy = getThemeStrategy(primaryTheme);
 
     if (dailyTarget) {
         return [
             `Hit today's target: ${formatDailyTarget(dailyTarget)} using both focus blocks.`,
-            `Track proof per partition: count completed, skipped, and why (${primaryTheme}).`,
+            `Track proof per partition: count completed, skipped, and why (${themeLabel}).`,
             `Use ${strategy.review} to write one blocker and one concrete fix for tomorrow.`,
         ];
     }
 
+    const dayChallenge =
+        day === 1 ? "baseline measurement"
+            : day === 2 ? "environment lock-in"
+                : day === 3 ? "stability checkpoint"
+                    : day === 4 ? "intensity increase"
+                        : day === 5 ? "friction removal"
+                            : "consolidation test";
+
+    if (primaryTheme === "phone-distraction") {
+        return [
+            "Set social apps cap to 60 minutes for today and enable app blocking during focus blocks.",
+            "Run 2 phone-out-of-reach focus blocks and log total deep-work minutes.",
+            `Track unlock count tonight and reduce it by at least 10% vs yesterday (${dayChallenge}).`,
+        ];
+    }
+    if (primaryTheme === "focus") {
+        return [
+            `Define one concrete output for "${aimText}" and complete 2 single-task blocks with no tab switching.`,
+            "Use a distraction capture list; record every interruption instead of context switching.",
+            `Log completion ratio (planned vs done) and target at least 70% (${dayChallenge}).`,
+        ];
+    }
+    if (primaryTheme === "sleep") {
+        return [
+            "Set a no-screen cutoff 45 minutes before bed and commit to it tonight.",
+            "Run a 15-minute wind-down routine (light stretch + next-day plan).",
+            `Record bedtime and wake time; target at least 7h total sleep (${dayChallenge}).`,
+        ];
+    }
+    if (primaryTheme === "stress") {
+        return [
+            "Run two 3-minute decompression resets (breath + posture) before major tasks.",
+            "Limit today to top 3 priorities and complete #1 before midday.",
+            `Rate stress morning/evening (1-10) and write one trigger-response correction (${dayChallenge}).`,
+        ];
+    }
+    if (primaryTheme === "procrastination") {
+        return [
+            "Start the hardest task with a 5-minute entry action within the first working hour.",
+            "Run 2 timed sprints before opening low-value apps/sites.",
+            `Log the delay trigger and apply one friction fix immediately (${dayChallenge}).`,
+        ];
+    }
+    if (primaryTheme === "energy") {
+        return [
+            "Drink 500ml water and complete a 5-minute movement warm-up before first focus block.",
+            `Do one high-impact task while energy is highest and finish one measurable output for "${aimText}".`,
+            `Score energy 3 times today (1-10) and adjust workload after any score below 5 (${dayChallenge}).`,
+        ];
+    }
+    if (primaryTheme === "emotional-regulation") {
+        return [
+            "Do a 3-minute grounding reset before first work block and once when emotion spikes.",
+            `Write one emotion label plus one useful action before continuing work on "${aimText}".`,
+            `End day with a 5-line reflection (trigger, thought, action, outcome, adjustment) (${dayChallenge}).`,
+        ];
+    }
+    if (primaryTheme === "planning") {
+        return [
+            "Set top 3 outcomes with realistic effort limits before you begin.",
+            "Execute tasks in planned order and defer new tasks to a capture list.",
+            `Run a plan-vs-actual review at end of day and move one task realistically (${dayChallenge}).`,
+        ];
+    }
+    if (primaryTheme === "confidence") {
+        return [
+            "Write one evidence line from past success before starting today's hardest task.",
+            "Complete one meaningful challenge action and save a proof artifact.",
+            `Log one win signal and one skill gap with a next practice step (${dayChallenge}).`,
+        ];
+    }
+
     return [
-        `Complete one measurable action toward "${aimText}" with clear finish criteria.`,
-        "Log one proof artifact (count, timestamp, note, or output link).",
-        `Write one adjustment tied to ${primaryTheme} for tomorrow.`,
+        `Finish one measurable milestone for "${aimText}" with clear done criteria.`,
+        "Run 2 focus blocks and track delivered output (count, note, or artifact).",
+        `Write one adjustment tied to ${themeLabel} using today's measured results (${dayChallenge}).`,
     ];
 }
 
 function buildReviewTasks(dailyTarget: DailyTarget | null, insight: AimInsight): string[] {
     const primaryTheme = insight.themes[0] ?? "productivity";
+    const themeLabel = formatThemeLabel(primaryTheme);
 
     if (dailyTarget) {
         return [
             `Measure weekly completion against ${formatDailyTarget(dailyTarget)}.`,
             "Identify where partition size or pace failed.",
-            `Set next week's target with improved partition sizing and a ${primaryTheme} safeguard.`,
+            `Set next week's target with improved partition sizing and a ${themeLabel} safeguard.`,
         ];
     }
 
     return [
         "Measure completion against the 7-day aim.",
-        `List what worked and what blocked progress in ${primaryTheme}.`,
+        `List what worked and what blocked progress in ${themeLabel}.`,
         "Set one clear measurable adjustment for the next 7 days.",
     ];
 }
@@ -634,7 +717,7 @@ function buildFallbackDays(aimText: string, goalType: GoalType): DayPlan[] {
     const durations = getFallbackDurations(goalType);
     const dailyTarget = parseDailyTarget(aimText);
     const insight = analyzeAimInsight(aimText, goalType);
-    const primaryThemeLabel = (insight.themes[0] ?? "productivity").replace(/-/g, " ");
+    const primaryThemeLabel = formatThemeLabel(insight.themes[0] ?? "productivity");
 
     const totalActiveMinutes = durations.focusMinutes * 2 + durations.reviewMinutes;
     const totalRestMinutes = durations.breakMinutes * 2 + durations.reviewBreakMinutes;
@@ -659,7 +742,7 @@ function buildFallbackDays(aimText: string, goalType: GoalType): DayPlan[] {
 
         const tasks = isReviewDay
             ? buildReviewTasks(dailyTarget, insight)
-            : buildExecutionTasks(aimText, dailyTarget, insight);
+            : buildExecutionTasks(aimText, dailyTarget, insight, day);
 
         return {
             day,
