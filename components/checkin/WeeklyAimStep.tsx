@@ -33,7 +33,7 @@ export function WeeklyAimStep({
                     Hey {firstName}, what is your aim for the next 7 days?
                 </h2>
                 <p className="text-white/50 text-sm mt-2">
-                    One clear aim. Be specific so AI can split it into focused blocks and break guidance.
+                    Share either a clear goal or your current struggle. AI will convert it into a strategic 7-day plan.
                 </p>
             </div>
 
@@ -41,7 +41,7 @@ export function WeeklyAimStep({
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 text-sm resize-none focus:outline-none focus:border-neon-cyan/60 transition-colors"
                 rows={4}
                 maxLength={200}
-                placeholder="e.g. Cover 4 chapters a day / Ship my portfolio page / Sleep by 11 PM"
+                placeholder="e.g. I feel distracted and waste too much time on my phone"
                 value={aimText}
                 onChange={(e) => setAimText(e.target.value)}
                 disabled={isSubmitting}
@@ -74,7 +74,7 @@ export function WeeklyAimStep({
             </button>
 
             <p className="text-white/30 text-xs text-center">
-                AI generates flexible block partitions with focus time and break time based on your behavior.
+                AI analyzes tone + problems, then builds a measurable Day 1-Day 7 coaching plan.
             </p>
         </div>
     );

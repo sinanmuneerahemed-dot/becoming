@@ -75,6 +75,39 @@ interface BlockDurations {
     reviewBreakMinutes: number;
 }
 
+type EmotionalTone =
+    | "overwhelmed"
+    | "anxious"
+    | "frustrated"
+    | "low_mood"
+    | "confused"
+    | "neutral";
+
+type IntentType =
+    | "stabilize"
+    | "improve_performance"
+    | "build_consistency"
+    | "recover_balance"
+    | "clarify_direction";
+
+type ProblemTheme =
+    | "phone-distraction"
+    | "focus"
+    | "sleep"
+    | "stress"
+    | "procrastination"
+    | "energy"
+    | "emotional-regulation"
+    | "planning"
+    | "confidence"
+    | "productivity";
+
+interface AimInsight {
+    tone: EmotionalTone;
+    intent: IntentType;
+    themes: ProblemTheme[];
+}
+
 const PLAN_RETRY_OPTIONS: GeminiGenerationOptions[] = [
     { temperature: 0.35, maxOutputTokens: 4096, responseMimeType: "application/json" },
     { temperature: 0.2, maxOutputTokens: 4096 },
@@ -84,6 +117,18 @@ const MIN_TASKS_PER_DAY = 3;
 const MIN_SCHEDULE_LINES = 3;
 const DAILY_TARGET_REGEX = /(\d{1,3})\s*(chapter|chapters|page|pages|problem|problems|task|tasks|lesson|lessons|module|modules|video|videos|exercise|exercises|topic|topics|question|questions|set|sets|unit|units)\s*(?:(?:a|per)\s*day|\/\s*day|daily|every\s+day)\b/i;
 const CLOCK_TIME_PREFIX_REGEX = /^\s*(?:\d{1,2}:\d{2}\s*[\-\u2013\u2014]\s*\d{1,2}:\d{2}|\d{1,2}\s*(?:am|pm)\s*[\-\u2013\u2014]\s*\d{1,2}\s*(?:am|pm))\s*[\-\u2013\u2014]?\s*/i;
+const GENERIC_TASK_PATTERNS: RegExp[] = [
+    /\bstay positive\b/i,
+    /\btry to\b/i,
+    /\bdo your best\b/i,
+    /\bkeep going\b/i,
+    /\bbe consistent\b/i,
+    /\bstay motivated\b/i,
+    /\bbelieve in yourself\b/i,
+    /\bdon't give up\b/i,
+];
+const MEASURABLE_SIGNAL_REGEX =
+    /\b(\d+(\.\d+)?)\b|\b(min|mins|minute|minutes|hour|hours|times|sessions|blocks|pages|chapter|chapters|tasks|steps|km|miles)\b/i;
 
 function sanitizeText(value: unknown, fallback = ""): string {
     if (typeof value !== "string") return fallback;
@@ -235,6 +280,178 @@ function formatPartitionRange(target: DailyTarget, partition: { from: number; to
     return `${target.unitPlural} ${partition.from}-${partition.to}`;
 }
 
+function detectTone(aimText: string): EmotionalTone {
+    const text = aimText.toLowerCase();
+    if (/(overwhelm|burnout|can't cope|too much|breaking down|exhausted)/.test(text)) {
+        return "overwhelmed";
+    }
+    if (/(anxious|anxiety|panic|worried|nervous|fear|afraid)/.test(text)) {
+        return "anxious";
+    }
+    if (/(frustrated|irritated|angry|annoyed|stuck|fed up)/.test(text)) {
+        return "frustrated";
+    }
+    if (/(sad|low|empty|numb|demotivated|hopeless|down)/.test(text)) {
+        return "low_mood";
+    }
+    if (/(confused|unclear|lost|don't know|unsure|directionless)/.test(text)) {
+        return "confused";
+    }
+    return "neutral";
+}
+
+function detectThemes(aimText: string): ProblemTheme[] {
+    const text = aimText.toLowerCase();
+    const themes: ProblemTheme[] = [];
+
+    if (/(phone|instagram|youtube|tiktok|reel|social media|doomscroll|screen)/.test(text)) {
+        themes.push("phone-distraction");
+    }
+    if (/(focus|distract|attention|deep work|concentrat)/.test(text)) {
+        themes.push("focus");
+    }
+    if (/(sleep|insomnia|late night|wake up|bedtime|rest)/.test(text)) {
+        themes.push("sleep");
+    }
+    if (/(stress|pressure|tense|overwhelm|overloaded)/.test(text)) {
+        themes.push("stress");
+    }
+    if (/(procrastinat|delay|later|avoid|last minute)/.test(text)) {
+        themes.push("procrastination");
+    }
+    if (/(energy|tired|fatigue|drained|exhaust)/.test(text)) {
+        themes.push("energy");
+    }
+    if (/(emotion|mood|mental|mind|anxiety|sad|overthink)/.test(text)) {
+        themes.push("emotional-regulation");
+    }
+    if (/(plan|schedule|routine|organize|structure)/.test(text)) {
+        themes.push("planning");
+    }
+    if (/(confidence|self doubt|imposter|self-esteem)/.test(text)) {
+        themes.push("confidence");
+    }
+    if (/(productiv|output|waste time|efficiency|performance)/.test(text)) {
+        themes.push("productivity");
+    }
+
+    if (themes.length === 0) {
+        themes.push("productivity");
+    }
+
+    return Array.from(new Set(themes)).slice(0, 3);
+}
+
+function detectIntent(aimText: string, goalType: GoalType, tone: EmotionalTone): IntentType {
+    const text = aimText.toLowerCase();
+
+    if (tone === "overwhelmed" || tone === "anxious") {
+        return "stabilize";
+    }
+    if (/(consisten|habit|daily|routine|discipline)/.test(text)) {
+        return "build_consistency";
+    }
+    if (/(recover|balance|reset|sleep|stress|calm)/.test(text)) {
+        return "recover_balance";
+    }
+    if (/(clarity|direction|figure out|decide|priority)/.test(text)) {
+        return "clarify_direction";
+    }
+    if (goalType === "academic" || goalType === "fitness" || goalType === "creative") {
+        return "improve_performance";
+    }
+    return "improve_performance";
+}
+
+function analyzeAimInsight(aimText: string, goalType: GoalType): AimInsight {
+    const tone = detectTone(aimText);
+    const themes = detectThemes(aimText);
+    const intent = detectIntent(aimText, goalType, tone);
+    return { tone, intent, themes };
+}
+
+function getThemeStrategy(theme: ProblemTheme): { setup: string; execution: string; review: string } {
+    switch (theme) {
+        case "phone-distraction":
+            return {
+                setup: "phone parked outside arm's reach + distracting apps blocked",
+                execution: "single-task sprint with zero social feed access",
+                review: "screen audit: total social minutes and top trigger moments",
+            };
+        case "focus":
+            return {
+                setup: "define one clear target and remove all non-essential tabs",
+                execution: "deep-focus sprint on one deliverable only",
+                review: "log completion ratio and top distraction source",
+            };
+        case "sleep":
+            return {
+                setup: "set wind-down trigger and no-screen cutoff",
+                execution: "night routine with low-stimulation activities",
+                review: "record sleep start time and next-morning energy score",
+            };
+        case "stress":
+            return {
+                setup: "2-minute decompression + top-3 priorities list",
+                execution: "priority-first work with deliberate breath reset",
+                review: "stress check (1-10) and recovery choice for tomorrow",
+            };
+        case "procrastination":
+            return {
+                setup: "2-minute starter action on the hardest task",
+                execution: "time-boxed progress sprint before any low-value task",
+                review: "capture what caused delay and first fix for next day",
+            };
+        case "energy":
+            return {
+                setup: "hydration + quick movement activation",
+                execution: "high-impact task during peak-energy window",
+                review: "energy trend check and workload adjustment",
+            };
+        case "emotional-regulation":
+            return {
+                setup: "short grounding exercise + emotional label check",
+                execution: "goal action while monitoring emotional drift",
+                review: "journal one trigger and one healthy response",
+            };
+        case "planning":
+            return {
+                setup: "define top-3 outcomes and realistic effort budget",
+                execution: "execute in planned order with one-task-at-a-time rule",
+                review: "plan-vs-actual gap analysis for tomorrow",
+            };
+        case "confidence":
+            return {
+                setup: "state one evidence-based capability before starting",
+                execution: "complete a meaningful challenge with proof artifact",
+                review: "log one success signal and one growth edge",
+            };
+        default:
+            return {
+                setup: "clarify one measurable result and environment setup",
+                execution: "focused progress sprint on top priority task",
+                review: "capture metrics and next-day correction",
+            };
+    }
+}
+
+function getToneSupportInstruction(tone: EmotionalTone): string {
+    switch (tone) {
+        case "overwhelmed":
+            return "Keep steps simple, low-friction, and recovery-aware; avoid overload.";
+        case "anxious":
+            return "Use calming structure: predictable sequence, small wins, and uncertainty reduction.";
+        case "frustrated":
+            return "Use short challenge-reward loops and clear progress proof to reduce frustration.";
+        case "low_mood":
+            return "Use very small but meaningful actions to rebuild momentum without pressure.";
+        case "confused":
+            return "Prioritize clarity: one decision checkpoint and one priority lock-in each day.";
+        default:
+            return "Supportive and direct coaching tone with clear accountability.";
+    }
+}
+
 function detectGoalType(aimText: string): GoalType {
     const text = aimText.toLowerCase();
 
@@ -302,6 +519,13 @@ function getGoalBlocks(goalType: GoalType): [string, string, string] {
 
 function getFallbackPlanTitle(aimText: string, goalType: GoalType): string {
     const shortAim = aimText.replace(/\s+/g, " ").trim().slice(0, 36);
+    const insight = analyzeAimInsight(aimText, goalType);
+    const intentLabel =
+        insight.intent === "stabilize" ? "Stability"
+            : insight.intent === "build_consistency" ? "Consistency"
+                : insight.intent === "recover_balance" ? "Recovery"
+                    : insight.intent === "clarify_direction" ? "Clarity"
+                        : "Performance";
     const prefix =
         goalType === "fitness" ? "7-Day Fitness Direction"
             : goalType === "habit" ? "7-Day Habit Direction"
@@ -309,16 +533,19 @@ function getFallbackPlanTitle(aimText: string, goalType: GoalType): string {
                     : goalType === "health" ? "7-Day Health Direction"
                         : goalType === "academic" ? "7-Day Academic Direction"
                             : "7-Day Goal Direction";
-    return `${prefix}: ${shortAim}`;
+    return `${prefix} (${intentLabel}): ${shortAim}`;
 }
 
 function buildExecutionScheduleLines(
     aimText: string,
     blocks: [string, string, string],
     durations: BlockDurations,
-    dailyTarget: DailyTarget | null
+    dailyTarget: DailyTarget | null,
+    insight: AimInsight
 ): string[] {
     const [block1, block2, block3] = blocks;
+    const primaryTheme = insight.themes[0] ?? "productivity";
+    const strategy = getThemeStrategy(primaryTheme);
 
     if (dailyTarget) {
         const partitions = buildTargetPartitions(dailyTarget);
@@ -326,16 +553,16 @@ function buildExecutionScheduleLines(
         const secondPartition = partitions[1] ?? partitions[0]!;
 
         return [
-            `Block 1 (${block1} - Focus ${durations.focusMinutes}m + Break ${durations.breakMinutes}m): complete ${formatPartitionRange(dailyTarget, firstPartition)} for "${aimText}"`,
-            `Block 2 (${block2} - Focus ${durations.focusMinutes}m + Break ${durations.breakMinutes}m): complete ${formatPartitionRange(dailyTarget, secondPartition)} and check quality`,
-            `Block 3 (${block3} - Focus ${durations.reviewMinutes}m + Break ${durations.reviewBreakMinutes}m): active recall + error log for today's target`,
+            `Block 1 (${block1} - Focus ${durations.focusMinutes}m + Break ${durations.breakMinutes}m): ${strategy.setup}; complete ${formatPartitionRange(dailyTarget, firstPartition)} for "${aimText}"`,
+            `Block 2 (${block2} - Focus ${durations.focusMinutes}m + Break ${durations.breakMinutes}m): ${strategy.execution}; complete ${formatPartitionRange(dailyTarget, secondPartition)}`,
+            `Block 3 (${block3} - Focus ${durations.reviewMinutes}m + Break ${durations.reviewBreakMinutes}m): ${strategy.review}; capture proof for today's target`,
         ];
     }
 
     return [
-        `Block 1 (${block1} - Focus ${durations.focusMinutes}m + Break ${durations.breakMinutes}m): highest-priority action for "${aimText}"`,
-        `Block 2 (${block2} - Focus ${durations.focusMinutes}m + Break ${durations.breakMinutes}m): second measurable progress sprint`,
-        `Block 3 (${block3} - Focus ${durations.reviewMinutes}m + Break ${durations.reviewBreakMinutes}m): review outcome and set tomorrow's adjustment`,
+        `Block 1 (${block1} - Focus ${durations.focusMinutes}m + Break ${durations.breakMinutes}m): ${strategy.setup}; launch highest-priority action for "${aimText}"`,
+        `Block 2 (${block2} - Focus ${durations.focusMinutes}m + Break ${durations.breakMinutes}m): ${strategy.execution}; push measurable progress sprint`,
+        `Block 3 (${block3} - Focus ${durations.reviewMinutes}m + Break ${durations.reviewBreakMinutes}m): ${strategy.review}; set tomorrow's adjustment`,
     ];
 }
 
@@ -343,54 +570,62 @@ function buildReviewScheduleLines(
     aimText: string,
     blocks: [string, string, string],
     durations: BlockDurations,
-    dailyTarget: DailyTarget | null
+    dailyTarget: DailyTarget | null,
+    insight: AimInsight
 ): string[] {
     const [block1, block2, block3] = blocks;
+    const primaryTheme = insight.themes[0] ?? "productivity";
+    const strategy = getThemeStrategy(primaryTheme);
 
     if (dailyTarget) {
         return [
-            `Block 1 (${block1} - Focus ${durations.focusMinutes}m + Break ${durations.breakMinutes}m): audit completion against ${formatDailyTarget(dailyTarget)}`,
-            `Block 2 (${block2} - Focus ${durations.focusMinutes}m + Break ${durations.breakMinutes}m): revisit weakest ${dailyTarget.unitPlural} and patch gaps`,
-            `Block 3 (${block3} - Focus ${durations.reviewMinutes}m + Break ${durations.reviewBreakMinutes}m): define next week's partition plan`,
+            `Block 1 (${block1} - Focus ${durations.focusMinutes}m + Break ${durations.breakMinutes}m): audit completion against ${formatDailyTarget(dailyTarget)} and map failures`,
+            `Block 2 (${block2} - Focus ${durations.focusMinutes}m + Break ${durations.breakMinutes}m): ${strategy.execution}; revisit weakest ${dailyTarget.unitPlural}`,
+            `Block 3 (${block3} - Focus ${durations.reviewMinutes}m + Break ${durations.reviewBreakMinutes}m): ${strategy.review}; define next week's partition plan`,
         ];
     }
 
     return [
         `Block 1 (${block1} - Focus ${durations.focusMinutes}m + Break ${durations.breakMinutes}m): collect outputs for "${aimText}" from Days 1-6`,
-        `Block 2 (${block2} - Focus ${durations.focusMinutes}m + Break ${durations.breakMinutes}m): finish top remaining high-impact work`,
-        `Block 3 (${block3} - Focus ${durations.reviewMinutes}m + Break ${durations.reviewBreakMinutes}m): choose next-week carry-forward actions`,
+        `Block 2 (${block2} - Focus ${durations.focusMinutes}m + Break ${durations.breakMinutes}m): ${strategy.execution}; finish highest-impact unfinished work`,
+        `Block 3 (${block3} - Focus ${durations.reviewMinutes}m + Break ${durations.reviewBreakMinutes}m): ${strategy.review}; choose next-week carry-forward actions`,
     ];
 }
 
-function buildExecutionTasks(aimText: string, dailyTarget: DailyTarget | null): string[] {
+function buildExecutionTasks(aimText: string, dailyTarget: DailyTarget | null, insight: AimInsight): string[] {
+    const primaryTheme = insight.themes[0] ?? "productivity";
+    const strategy = getThemeStrategy(primaryTheme);
+
     if (dailyTarget) {
         return [
             `Hit today's target: ${formatDailyTarget(dailyTarget)} using both focus blocks.`,
-            "Track proof per partition (what was completed, what was skipped).",
-            "Write one blocker and one concrete fix for tomorrow.",
+            `Track proof per partition: count completed, skipped, and why (${primaryTheme}).`,
+            `Use ${strategy.review} to write one blocker and one concrete fix for tomorrow.`,
         ];
     }
 
     return [
-        `Complete one measurable action toward "${aimText}"`,
-        "Log one proof artifact (count, note, or output).",
-        "Write one adjustment for tomorrow.",
+        `Complete one measurable action toward "${aimText}" with clear finish criteria.`,
+        "Log one proof artifact (count, timestamp, note, or output link).",
+        `Write one adjustment tied to ${primaryTheme} for tomorrow.`,
     ];
 }
 
-function buildReviewTasks(dailyTarget: DailyTarget | null): string[] {
+function buildReviewTasks(dailyTarget: DailyTarget | null, insight: AimInsight): string[] {
+    const primaryTheme = insight.themes[0] ?? "productivity";
+
     if (dailyTarget) {
         return [
             `Measure weekly completion against ${formatDailyTarget(dailyTarget)}.`,
             "Identify where partition size or pace failed.",
-            "Set next week's target with improved partition sizing.",
+            `Set next week's target with improved partition sizing and a ${primaryTheme} safeguard.`,
         ];
     }
 
     return [
         "Measure completion against the 7-day aim.",
-        "List what worked and what blocked progress.",
-        "Set one clear adjustment for the next 7 days.",
+        `List what worked and what blocked progress in ${primaryTheme}.`,
+        "Set one clear measurable adjustment for the next 7 days.",
     ];
 }
 
@@ -398,6 +633,8 @@ function buildFallbackDays(aimText: string, goalType: GoalType): DayPlan[] {
     const blocks = getGoalBlocks(goalType);
     const durations = getFallbackDurations(goalType);
     const dailyTarget = parseDailyTarget(aimText);
+    const insight = analyzeAimInsight(aimText, goalType);
+    const primaryThemeLabel = (insight.themes[0] ?? "productivity").replace(/-/g, " ");
 
     const totalActiveMinutes = durations.focusMinutes * 2 + durations.reviewMinutes;
     const totalRestMinutes = durations.breakMinutes * 2 + durations.reviewBreakMinutes;
@@ -406,7 +643,7 @@ function buildFallbackDays(aimText: string, goalType: GoalType): DayPlan[] {
     return Array.from({ length: 7 }, (_, index) => {
         const day = index + 1;
         const isReviewDay = day === 7;
-        const focus =
+        const baseFocus =
             day === 1 ? "Setup and baseline"
                 : day === 2 ? "Build execution rhythm"
                     : day === 3 ? "Checkpoint and corrections"
@@ -414,14 +651,15 @@ function buildFallbackDays(aimText: string, goalType: GoalType): DayPlan[] {
                             : day === 5 ? "Refine technique"
                                 : day === 6 ? "Consolidate gains"
                                     : "Consolidate and evaluate";
+        const focus = `${baseFocus} (${primaryThemeLabel})`;
 
         const schedule = isReviewDay
-            ? buildReviewScheduleLines(aimText, blocks, durations, dailyTarget)
-            : buildExecutionScheduleLines(aimText, blocks, durations, dailyTarget);
+            ? buildReviewScheduleLines(aimText, blocks, durations, dailyTarget, insight)
+            : buildExecutionScheduleLines(aimText, blocks, durations, dailyTarget, insight);
 
         const tasks = isReviewDay
-            ? buildReviewTasks(dailyTarget)
-            : buildExecutionTasks(aimText, dailyTarget);
+            ? buildReviewTasks(dailyTarget, insight)
+            : buildExecutionTasks(aimText, dailyTarget, insight);
 
         return {
             day,
@@ -435,6 +673,8 @@ function buildFallbackDays(aimText: string, goalType: GoalType): DayPlan[] {
 
 function buildFallbackCore(aimText: string): NormalizedPlan {
     const goalType = detectGoalType(aimText);
+    const insight = analyzeAimInsight(aimText, goalType);
+    const primaryTheme = insight.themes[0] ?? "productivity";
     const planTitle = getFallbackPlanTitle(aimText, goalType);
     const days = buildFallbackDays(aimText, goalType);
 
@@ -442,10 +682,10 @@ function buildFallbackCore(aimText: string): NormalizedPlan {
         planTitle,
         days,
         checkpoints: {
-            day3: "Check measurable output and effort consistency. If output is low, reduce scope and keep blocks smaller but non-zero.",
-            day7: "Compare Day 1 baseline vs Day 7 results using your logged evidence. Keep what worked and remove one ineffective pattern.",
+            day3: `Check output quality and effort consistency for ${primaryTheme}. If progress is weak, reduce scope and tighten environment controls.`,
+            day7: `Compare Day 1 baseline vs Day 7 results for ${primaryTheme}. Keep one winning pattern and remove one recurring blocker.`,
         },
-        ifYouMissDay: "Do not restart the full week. Run one 30-minute recovery block tomorrow, then continue with the next plan day.",
+        ifYouMissDay: "Do not restart the full week. Run one 30-minute recovery block tomorrow, complete the most critical pending action, then continue with the next plan day.",
     };
 }
 
@@ -489,6 +729,9 @@ function buildPlanRaw(normalized: NormalizedPlan): string {
 }
 
 function buildPlanPrompt(aimText: string, ctx: BehavioralContext, retry = false): string {
+    const goalType = detectGoalType(aimText);
+    const insight = analyzeAimInsight(aimText, goalType);
+    const primaryTheme = insight.themes[0] ?? "productivity";
     const energyLabel = ctx.avgEnergy < 2 ? "low" : ctx.avgEnergy < 3.5 ? "moderate" : "high";
     const stressLabel = ctx.avgStress > 2.5 ? "high" : ctx.avgStress > 1.5 ? "moderate" : "low";
     const focusLabel = ctx.avgFocus < 2 ? "scattered" : ctx.avgFocus < 3 ? "moderate" : "deep";
@@ -501,9 +744,17 @@ function buildPlanPrompt(aimText: string, ctx: BehavioralContext, retry = false)
     const targetHint = detectedTarget
         ? `Detected numeric daily target: ${formatDailyTarget(detectedTarget)}.`
         : "No explicit numeric daily quantity was detected.";
+    const toneGuidance = getToneSupportInstruction(insight.tone);
+    const contextRisks: string[] = [];
+    if (ctx.avgSleep < 6.5) contextRisks.push("sleep debt risk");
+    if (ctx.avgScreenTime > 6) contextRisks.push("digital overload risk");
+    if (ctx.avgStress > 2.5) contextRisks.push("high stress recovery risk");
+    if (ctx.avgFocus < 2.2) contextRisks.push("attention fragmentation risk");
+    if (ctx.avgEnergy < 2.2) contextRisks.push("low energy pacing risk");
+    const riskLine = contextRisks.length > 0 ? contextRisks.join(", ") : "no acute risk spike detected";
 
     return `You are BECOMING, a behavioral planning system.
-Create a practical 7-day plan for the exact user goal.
+Create a practical, personalized 7-day performance-coaching plan from the exact user input.
 Return ONLY valid JSON. No markdown. No explanations.
 
 JSON schema:
@@ -535,7 +786,9 @@ Critical constraints:
 - Never assume an academic goal unless the aim explicitly asks for study/exam work.
 - For non-academic goals, do not use chapter/revision/exam/subject/homework language.
 - If the aim includes a numeric daily target (example: "4 chapters a day"), partition that quantity across 2-3 blocks and label each partition clearly.
-- No motivational fluff. Keep every action specific and measurable.
+- Avoid generic coaching statements like "stay positive", "do your best", or "be consistent".
+- Every task must be specific and measurable with a clear output, count, or completion signal.
+- Use a supportive coaching tone: direct, calm, and practical.
 
 Behavioral adaptation:
 - Typical focus block length: ${sessionLen} minutes.
@@ -546,8 +799,23 @@ Behavioral adaptation:
 - Scattered focus: single-task blocks only.
 - High screen time: include a clear screen-free block.
 
+Planning intelligence requirements:
+- First infer emotional tone and user intent from input.
+- Identify 1-3 core themes and make them visible in day focuses/tasks.
+- Day progression must be strategic:
+  Day 1 reset/baseline, Day 2 environment design, Day 3 stabilization check,
+  Day 4 intensity increase, Day 5 friction removal, Day 6 consolidation, Day 7 review + next-week bridge.
+- Include at least one mindset shift or reflection prompt daily, but it must be actionable (not motivational fluff).
+- Each day should include one "proof of execution" element (what user will track).
+
 User aim: "${aimText}"
 Target hint: ${targetHint}
+Detected goal type: ${goalType}
+Detected emotional tone: ${insight.tone}
+Detected intent: ${insight.intent}
+Detected themes: ${insight.themes.join(", ")}
+Primary theme: ${primaryTheme}
+Tone guidance: ${toneGuidance}
 Behavioral context:
 - Energy: ${energyLabel} (${ctx.avgEnergy.toFixed(1)}/5)
 - Stress: ${stressLabel} (${ctx.avgStress.toFixed(1)}/4)
@@ -556,6 +824,7 @@ Behavioral context:
 - Screen time: ${screenLabel}
 - Common struggle: ${ctx.commonStruggle || "not identified"}
 - Mood: ${ctx.avgMood.toFixed(1)}/5
+- Risk summary: ${riskLine}
 
 ${retry ? "Retry mode: verify JSON syntax carefully and return a single valid JSON object only." : ""}`.trim();
 }
@@ -630,6 +899,57 @@ function estimateTimesFromBlocks(schedule: string[]): { active: string; rest: st
         active: activeMinutes > 0 ? formatMinutes(activeMinutes) : "",
         rest: restMinutes > 0 ? formatMinutes(restMinutes) : "",
     };
+}
+
+function isGenericTask(task: string): boolean {
+    return GENERIC_TASK_PATTERNS.some((pattern) => pattern.test(task));
+}
+
+function hasMeasurableSignal(text: string): boolean {
+    return MEASURABLE_SIGNAL_REGEX.test(text);
+}
+
+function extractAimKeywords(aimText: string): string[] {
+    const stopwords = new Set([
+        "that", "this", "with", "from", "have", "want", "need", "into", "your",
+        "will", "just", "really", "very", "much", "more", "less", "about", "feel",
+        "make", "goal", "week", "days", "day", "improve", "better", "toward",
+    ]);
+
+    return Array.from(
+        new Set(
+            aimText
+                .toLowerCase()
+                .split(/\W+/)
+                .map((w) => w.trim())
+                .filter((w) => w.length >= 4 && !stopwords.has(w))
+        )
+    ).slice(0, 8);
+}
+
+function buildThemeKeywordSet(themes: ProblemTheme[]): string[] {
+    const themeKeywords: Record<ProblemTheme, string[]> = {
+        "phone-distraction": ["phone", "screen", "social", "scroll", "digital"],
+        focus: ["focus", "deep", "attention", "distraction", "single-task"],
+        sleep: ["sleep", "bedtime", "wake", "rest", "wind-down"],
+        stress: ["stress", "decompress", "calm", "breath", "recovery"],
+        procrastination: ["start", "delay", "procrastination", "first step", "time-box"],
+        energy: ["energy", "fatigue", "hydration", "movement", "activation"],
+        "emotional-regulation": ["emotion", "mood", "trigger", "grounding", "journal"],
+        planning: ["plan", "priority", "sequence", "schedule", "review"],
+        confidence: ["confidence", "evidence", "challenge", "self-doubt", "wins"],
+        productivity: ["output", "deliverable", "complete", "progress", "execution"],
+    };
+
+    return Array.from(new Set(themes.flatMap((theme) => themeKeywords[theme] ?? [])));
+}
+
+function countMatchingLines(lines: string[], keywords: string[]): number {
+    if (keywords.length === 0) return 0;
+    return lines.filter((line) => {
+        const lower = line.toLowerCase();
+        return keywords.some((keyword) => lower.includes(keyword));
+    }).length;
 }
 
 function normalizeStructuredPlan(input: StructuredPlanPayload, aimText: string): NormalizedPlan {
@@ -718,9 +1038,30 @@ function normalizeStructuredPlan(input: StructuredPlanPayload, aimText: string):
     };
 }
 
-function isValidDirectionPlan(days: DayPlan[]): boolean {
+function isValidDirectionPlan(days: DayPlan[], aimText: string): boolean {
+    if (days.length !== 7) return false;
+
+    const goalType = detectGoalType(aimText);
+    const insight = analyzeAimInsight(aimText, goalType);
+    const relevanceKeywords = Array.from(
+        new Set([
+            ...extractAimKeywords(aimText),
+            ...buildThemeKeywordSet(insight.themes),
+        ])
+    );
+
+    const allLines = days.flatMap((day) => [day.focus, ...day.tasks, ...(day.schedule ?? [])]);
+    const relevanceHits = countMatchingLines(allLines, relevanceKeywords);
+    const measurableTaskDays = days.filter((day) => day.tasks.some((task) => hasMeasurableSignal(task))).length;
+    const accountabilityDays = days.filter((day) =>
+        day.tasks.some((task) => /\b(log|track|record|measure|proof|count|audit)\b/i.test(task))
+    ).length;
+    const weakTaskCount = days.reduce(
+        (sum, day) => sum + day.tasks.filter((task) => isGenericTask(task) || task.length < 14).length,
+        0
+    );
+
     return (
-        days.length === 7 &&
         days.every((day) =>
             day.day >= 1 &&
             day.day <= 7 &&
@@ -728,7 +1069,11 @@ function isValidDirectionPlan(days: DayPlan[]): boolean {
             day.tasks.length >= MIN_TASKS_PER_DAY &&
             (day.schedule?.length ?? 0) >= MIN_SCHEDULE_LINES &&
             (day.schedule ?? []).every((line) => hasDurationAndBreak(line))
-        )
+        ) &&
+        weakTaskCount === 0 &&
+        measurableTaskDays >= 6 &&
+        accountabilityDays >= 4 &&
+        relevanceHits >= 10
     );
 }
 
@@ -791,7 +1136,7 @@ export async function generateDirectionPlan(
             const structured = parseStructuredPlan(raw);
             const normalized = normalizeStructuredPlan(structured, aimText);
 
-            if (!isValidDirectionPlan(normalized.days)) {
+            if (!isValidDirectionPlan(normalized.days, aimText)) {
                 throw new Error("Generated plan failed validation.");
             }
 
