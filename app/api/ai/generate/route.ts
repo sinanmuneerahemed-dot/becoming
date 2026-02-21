@@ -21,6 +21,8 @@ interface RateLimitBucket {
 const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
 const RATE_LIMIT_MAX_REQUESTS = 25;
 const rateLimitBuckets = new Map<string, RateLimitBucket>();
+const UPSTREAM_TIMEOUT_MS = 55000;
+const UPSTREAM_RETRIES = 2;
 
 function readApiKey(): string {
   const key = process.env.GEMINI_API_KEY;
@@ -135,45 +137,88 @@ export async function POST(req: NextRequest) {
   try {
     const apiKey = readApiKey();
     const model = readModel();
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 35000);
+    let lastStatus = 0;
+    let lastDetails = "";
 
-    try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          signal: controller.signal,
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig,
-          }),
-        }
-      );
+    for (let attempt = 0; attempt < UPSTREAM_RETRIES; attempt++) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
 
-      if (!res.ok) {
-        const errText = await res.text();
-        return NextResponse.json(
-          { error: `Gemini upstream error (${res.status})`, details: errText.slice(0, 500) },
-          { status: 502 }
+      try {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: controller.signal,
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig,
+            }),
+          }
         );
-      }
 
-      const data = await res.json();
-      const text: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-      if (!text) {
-        return NextResponse.json({ error: "Gemini returned an empty response." }, { status: 502 });
-      }
+        if (!res.ok) {
+          lastStatus = res.status;
+          lastDetails = (await res.text()).slice(0, 500);
+          const shouldRetry = attempt < UPSTREAM_RETRIES - 1 && [429, 500, 502, 503, 504].includes(res.status);
+          if (shouldRetry) {
+            await new Promise((resolve) => setTimeout(resolve, 800 * (attempt + 1)));
+            continue;
+          }
+          return NextResponse.json(
+            { error: `Gemini upstream error (${res.status})`, details: lastDetails },
+            { status: 502 }
+          );
+        }
 
-      return NextResponse.json({ text });
-    } finally {
-      clearTimeout(timeout);
+        const data = await res.json();
+        const parts = data?.candidates?.[0]?.content?.parts;
+        const text: string = Array.isArray(parts)
+          ? parts
+              .map((p: unknown) => {
+                if (!p || typeof p !== "object") return "";
+                const t = (p as { text?: unknown }).text;
+                return typeof t === "string" ? t : "";
+              })
+              .join("")
+              .trim()
+          : "";
+        if (!text) {
+          lastStatus = 502;
+          lastDetails = "Gemini returned empty text payload.";
+          const shouldRetry = attempt < UPSTREAM_RETRIES - 1;
+          if (shouldRetry) {
+            await new Promise((resolve) => setTimeout(resolve, 800 * (attempt + 1)));
+            continue;
+          }
+          return NextResponse.json({ error: "Gemini returned an empty response." }, { status: 502 });
+        }
+
+        return NextResponse.json({ text });
+      } catch (err) {
+        if ((err as Error).name === "AbortError") {
+          if (attempt < UPSTREAM_RETRIES - 1) {
+            await new Promise((resolve) => setTimeout(resolve, 800 * (attempt + 1)));
+            continue;
+          }
+          return NextResponse.json({ error: "AI request timed out." }, { status: 504 });
+        }
+        if (attempt < UPSTREAM_RETRIES - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 800 * (attempt + 1)));
+          continue;
+        }
+        return NextResponse.json({ error: (err as Error).message || "AI request failed." }, { status: 500 });
+      } finally {
+        clearTimeout(timeout);
+      }
     }
+
+    return NextResponse.json(
+      { error: `Gemini upstream error (${lastStatus || 500})`, details: lastDetails || "Unknown upstream failure." },
+      { status: 502 }
+    );
   } catch (err) {
-    if ((err as Error).name === "AbortError") {
-      return NextResponse.json({ error: "AI request timed out." }, { status: 504 });
-    }
     return NextResponse.json({ error: (err as Error).message || "AI request failed." }, { status: 500 });
   }
 }

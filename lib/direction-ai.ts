@@ -109,8 +109,9 @@ interface AimInsight {
 }
 
 const PLAN_RETRY_OPTIONS: GeminiGenerationOptions[] = [
-    { temperature: 0.35, maxOutputTokens: 4096, responseMimeType: "application/json" },
-    { temperature: 0.2, maxOutputTokens: 4096 },
+    { temperature: 0.25, maxOutputTokens: 1700, responseMimeType: "application/json" },
+    { temperature: 0.15, maxOutputTokens: 1400, responseMimeType: "application/json" },
+    { temperature: 0.1, maxOutputTokens: 1200, responseMimeType: "application/json" },
 ];
 
 const MIN_TASKS_PER_DAY = 3;
@@ -951,9 +952,34 @@ function extractJsonObject(raw: string): string {
     return trimmed;
 }
 
+function parseJsonWithRepairs(jsonText: string): unknown {
+    const candidates = Array.from(new Set([
+        jsonText,
+        jsonText
+            .replace(/[\u201C\u201D]/g, "\"")
+            .replace(/[\u2018\u2019]/g, "'"),
+        jsonText.replace(/,\s*([}\]])/g, "$1"),
+        jsonText
+            .replace(/[\u201C\u201D]/g, "\"")
+            .replace(/[\u2018\u2019]/g, "'")
+            .replace(/,\s*([}\]])/g, "$1"),
+    ]));
+
+    let lastErr: unknown = null;
+    for (const candidate of candidates) {
+        try {
+            return JSON.parse(candidate);
+        } catch (err) {
+            lastErr = err;
+        }
+    }
+
+    throw lastErr instanceof Error ? lastErr : new Error("Failed to parse plan JSON.");
+}
+
 function parseStructuredPlan(raw: string): StructuredPlanPayload {
     const jsonText = extractJsonObject(raw);
-    const parsed = JSON.parse(jsonText);
+    const parsed = parseJsonWithRepairs(jsonText);
 
     if (!parsed || typeof parsed !== "object") {
         throw new Error("Gemini did not return a valid JSON plan object.");
@@ -1162,7 +1188,7 @@ function isValidDirectionPlan(days: DayPlan[], aimText: string): boolean {
 
 async function callGemini(prompt: string, options: GeminiGenerationOptions = {}): Promise<string> {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 35000);
+    const timeout = setTimeout(() => controller.abort(), 55000);
 
     try {
         const res = await fetch("/api/ai/generate", {
@@ -1197,7 +1223,7 @@ async function callGemini(prompt: string, options: GeminiGenerationOptions = {})
         return text;
     } catch (err) {
         if ((err as Error).name === "AbortError") {
-            throw new Error("AI request timed out after 35 seconds.");
+            throw new Error("AI request timed out after 55 seconds.");
         }
         throw err;
     } finally {
