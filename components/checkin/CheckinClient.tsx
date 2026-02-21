@@ -175,7 +175,14 @@ export function CheckinClient({ step }: CheckinClientProps) {
           toast.success("Your 7-Day Direction is set!");
         } catch (aiErr) {
           console.error("[Gemini] Plan generation failed, keeping fallback:", aiErr);
-          toast.success("Aim saved! A basic plan has been set.");
+          const msg = aiErr instanceof Error ? aiErr.message : "";
+          if (/429|rate|quota/i.test(msg)) {
+            toast.success("Aim saved with fallback. AI is rate-limited right now.");
+          } else if (/503|timeout|timed out/i.test(msg)) {
+            toast.success("Aim saved with fallback. AI is temporarily busy.");
+          } else {
+            toast.success("Aim saved! A basic plan has been set.");
+          }
         }
 
         router.push("/app");

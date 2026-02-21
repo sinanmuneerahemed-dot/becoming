@@ -1061,6 +1061,10 @@ function countMatchingLines(lines: string[], keywords: string[]): number {
     }).length;
 }
 
+function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function normalizeStructuredPlan(input: StructuredPlanPayload, aimText: string): NormalizedPlan {
     const fallback = buildFallbackCore(aimText);
     const planTitle = sanitizeText(input.planTitle, fallback.planTitle);
@@ -1257,6 +1261,9 @@ export async function generateDirectionPlan(
         } catch (err) {
             lastError = err;
             console.error(`[Gemini] Plan generation attempt ${attempt + 1} failed:`, err);
+            if (attempt < PLAN_RETRY_OPTIONS.length - 1) {
+                await sleep(1200 * (attempt + 1));
+            }
         }
     }
 

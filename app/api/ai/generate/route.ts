@@ -22,7 +22,7 @@ const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
 const RATE_LIMIT_MAX_REQUESTS = 25;
 const rateLimitBuckets = new Map<string, RateLimitBucket>();
 const UPSTREAM_TIMEOUT_MS = 55000;
-const UPSTREAM_RETRIES = 2;
+const UPSTREAM_RETRIES = 4;
 
 function readApiKey(): string {
   const key = process.env.GEMINI_API_KEY;
@@ -34,6 +34,29 @@ function readApiKey(): string {
 
 function readModel(): string {
   return process.env.GEMINI_MODEL || "gemini-flash-latest";
+}
+
+function readModelCandidates(): string[] {
+  const primary = readModel();
+  const fromEnv = (process.env.GEMINI_MODELS ?? "")
+    .split(",")
+    .map((m) => m.trim())
+    .filter(Boolean);
+
+  // Secondary fallback model improves resilience when one model is quota-limited.
+  const candidates = [primary, ...fromEnv, "gemini-1.5-flash-latest"];
+  return Array.from(new Set(candidates));
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parseRetryAfterSeconds(headerValue: string | null): number {
+  if (!headerValue) return 0;
+  const n = Number(headerValue.trim());
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.min(20, Math.max(1, Math.floor(n)));
 }
 
 function readClientIp(req: NextRequest): string {
@@ -136,81 +159,99 @@ export async function POST(req: NextRequest) {
 
   try {
     const apiKey = readApiKey();
-    const model = readModel();
+    const modelCandidates = readModelCandidates();
     let lastStatus = 0;
     let lastDetails = "";
 
-    for (let attempt = 0; attempt < UPSTREAM_RETRIES; attempt++) {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
+    for (const model of modelCandidates) {
+      for (let attempt = 0; attempt < UPSTREAM_RETRIES; attempt++) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
 
-      try {
-        const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            signal: controller.signal,
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig,
-            }),
-          }
-        );
-
-        if (!res.ok) {
-          lastStatus = res.status;
-          lastDetails = (await res.text()).slice(0, 500);
-          const shouldRetry = attempt < UPSTREAM_RETRIES - 1 && [429, 500, 502, 503, 504].includes(res.status);
-          if (shouldRetry) {
-            await new Promise((resolve) => setTimeout(resolve, 800 * (attempt + 1)));
-            continue;
-          }
-          return NextResponse.json(
-            { error: `Gemini upstream error (${res.status})`, details: lastDetails },
-            { status: 502 }
+        try {
+          const res = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              signal: controller.signal,
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig,
+              }),
+            }
           );
-        }
 
-        const data = await res.json();
-        const parts = data?.candidates?.[0]?.content?.parts;
-        const text: string = Array.isArray(parts)
-          ? parts
-              .map((p: unknown) => {
-                if (!p || typeof p !== "object") return "";
-                const t = (p as { text?: unknown }).text;
-                return typeof t === "string" ? t : "";
-              })
-              .join("")
-              .trim()
-          : "";
-        if (!text) {
-          lastStatus = 502;
-          lastDetails = "Gemini returned empty text payload.";
-          const shouldRetry = attempt < UPSTREAM_RETRIES - 1;
-          if (shouldRetry) {
-            await new Promise((resolve) => setTimeout(resolve, 800 * (attempt + 1)));
-            continue;
+          if (!res.ok) {
+            lastStatus = res.status;
+            lastDetails = (await res.text()).slice(0, 500);
+            const retryable = [429, 500, 502, 503, 504].includes(res.status);
+            const shouldRetry = attempt < UPSTREAM_RETRIES - 1 && retryable;
+            if (shouldRetry) {
+              const retryAfter =
+                res.status === 429
+                  ? parseRetryAfterSeconds(res.headers.get("retry-after"))
+                  : 0;
+              const backoffMs = retryAfter > 0
+                ? retryAfter * 1000
+                : Math.min(10000, 1200 * (attempt + 1));
+              await sleep(backoffMs);
+              continue;
+            }
+            // Model unsupported or exhausted; move to next model candidate.
+            if ([404, 429, 500, 502, 503, 504].includes(res.status)) {
+              break;
+            }
+            return NextResponse.json(
+              { error: `Gemini upstream error (${res.status})`, details: lastDetails },
+              { status: 502 }
+            );
           }
-          return NextResponse.json({ error: "Gemini returned an empty response." }, { status: 502 });
-        }
 
-        return NextResponse.json({ text });
-      } catch (err) {
-        if ((err as Error).name === "AbortError") {
+          const data = await res.json();
+          const parts = data?.candidates?.[0]?.content?.parts;
+          const text: string = Array.isArray(parts)
+            ? parts
+                .map((p: unknown) => {
+                  if (!p || typeof p !== "object") return "";
+                  const t = (p as { text?: unknown }).text;
+                  return typeof t === "string" ? t : "";
+                })
+                .join("")
+                .trim()
+            : "";
+          if (!text) {
+            lastStatus = 502;
+            lastDetails = "Gemini returned empty text payload.";
+            const shouldRetry = attempt < UPSTREAM_RETRIES - 1;
+            if (shouldRetry) {
+              await sleep(Math.min(10000, 1200 * (attempt + 1)));
+              continue;
+            }
+            break;
+          }
+
+          return NextResponse.json({ text });
+        } catch (err) {
+          if ((err as Error).name === "AbortError") {
+            if (attempt < UPSTREAM_RETRIES - 1) {
+              await sleep(Math.min(10000, 1200 * (attempt + 1)));
+              continue;
+            }
+            lastStatus = 504;
+            lastDetails = `Timeout at model ${model}`;
+            break;
+          }
           if (attempt < UPSTREAM_RETRIES - 1) {
-            await new Promise((resolve) => setTimeout(resolve, 800 * (attempt + 1)));
+            await sleep(Math.min(10000, 1200 * (attempt + 1)));
             continue;
           }
-          return NextResponse.json({ error: "AI request timed out." }, { status: 504 });
+          lastStatus = 500;
+          lastDetails = (err as Error).message || "Unknown upstream error.";
+          break;
+        } finally {
+          clearTimeout(timeout);
         }
-        if (attempt < UPSTREAM_RETRIES - 1) {
-          await new Promise((resolve) => setTimeout(resolve, 800 * (attempt + 1)));
-          continue;
-        }
-        return NextResponse.json({ error: (err as Error).message || "AI request failed." }, { status: 500 });
-      } finally {
-        clearTimeout(timeout);
       }
     }
 
