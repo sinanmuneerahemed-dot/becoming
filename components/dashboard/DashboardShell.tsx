@@ -9,24 +9,32 @@ import { TodayView } from "./TodayView";
 import { SevenDayView } from "./SevenDayView";
 import { ThirtyDayView } from "./ThirtyDayView";
 import { HistoryView } from "./HistoryView";
+import { FloatingGlassMenu } from "./FloatingGlassMenu";
 
 type Tab = "today" | "7days" | "30days" | "history";
+
+const TABS = [
+  { id: "today", label: "Today", icon: "☀️" },
+  { id: "7days", label: "Last 7 Days", icon: "📊" },
+  { id: "30days", label: "Monthly", icon: "📅" },
+  { id: "history", label: "History", icon: "📜" },
+];
 
 export function DashboardShell() {
   const { user, signOut } = useAuth();
   const [tab, setTab] = useState<Tab>("today");
 
   return (
-    <div className="min-h-screen px-4 sm:px-6 py-6 sm:py-8">
+    <div className="min-h-screen px-4 sm:px-6 py-6 sm:py-8 pb-32">
       <div className="max-w-4xl mx-auto">
-        <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
+        <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-10 sm:mb-12">
           <div className="min-w-0 flex items-center gap-3">
             <Link href="/">
               <img src="/logo.png" alt="Becoming" className="h-8 w-auto" />
             </Link>
             <div>
-            <h1 className="text-xl sm:text-2xl font-bold truncate">Dashboard</h1>
-            <p className="text-white/60 text-sm mt-1 truncate">{user?.displayName ?? user?.email ?? "User"}</p>
+              <h1 className="text-xl sm:text-2xl font-bold truncate">Dashboard</h1>
+              <p className="text-white/60 text-sm mt-1 truncate">{user?.displayName ?? user?.email ?? "User"}</p>
             </div>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 shrink-0">
@@ -36,12 +44,7 @@ export function DashboardShell() {
             <NeonButton variant="ghost" onClick={() => signOut()} className="w-full sm:w-auto justify-center">Sign out</NeonButton>
           </div>
         </header>
-        <div className="flex flex-wrap gap-2 mb-6 sm:mb-8">
-          <NeonPill active={tab === "today"} onClick={() => setTab("today")}>Today</NeonPill>
-          <NeonPill active={tab === "7days"} onClick={() => setTab("7days")}>7 Days</NeonPill>
-          <NeonPill active={tab === "30days"} onClick={() => setTab("30days")}>30 Days</NeonPill>
-          <NeonPill active={tab === "history"} onClick={() => setTab("history")}>History</NeonPill>
-        </div>
+
         <div className="min-h-[400px]">
           {tab === "today" && <TodayView />}
           {tab === "7days" && <SevenDayView />}
@@ -49,6 +52,12 @@ export function DashboardShell() {
           {tab === "history" && <HistoryView />}
         </div>
       </div>
+
+      <FloatingGlassMenu
+        activeTab={tab}
+        onTabChange={setTab}
+        tabs={TABS}
+      />
     </div>
   );
 }
