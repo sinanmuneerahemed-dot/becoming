@@ -276,11 +276,11 @@ export interface WeeklyAim {
   days: DayPlan[];
   completionResult?: "yes" | "partially" | "no";
   reflectionSummary?: string;
-  checkpoints: {
+  checkpoints?: {
     day3: string;
     day7: string;
   };
-  ifYouMissDay: string;
+  ifYouMissDay?: string;
   goalInterpretation?: string;
   strategicBreakdown?: string;
   expectedOutcome?: string;

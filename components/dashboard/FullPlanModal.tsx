@@ -276,16 +276,22 @@ export function FullPlanModal({ aim, currentDay, onClose }: FullPlanModalProps) 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                             <div className="space-y-1">
                                 <p className="text-[10px] font-bold text-white/30 uppercase tracking-wider">Checkpoint Day 3</p>
-                                <p className="text-sm text-white/60 leading-relaxed font-medium italic">{aim.checkpoints.day3}</p>
+                                <p className="text-sm text-white/60 leading-relaxed font-medium italic">
+                                    {aim.checkpoints?.day3 || "Evaluate initial momentum and adjust workload if needed."}
+                                </p>
                             </div>
                             <div className="space-y-1">
                                 <p className="text-[10px] font-bold text-white/30 uppercase tracking-wider">Checkpoint Day 7</p>
-                                <p className="text-sm text-white/60 leading-relaxed font-medium italic">{aim.checkpoints.day7}</p>
+                                <p className="text-sm text-white/60 leading-relaxed font-medium italic">
+                                    {aim.checkpoints?.day7 || "Final review of deliverables and sustainability check."}
+                                </p>
                             </div>
                         </div>
                         <div className="pt-2 border-t border-white/5">
                             <p className="text-[10px] font-bold text-white/30 uppercase tracking-wider mb-1">If You Miss a Day</p>
-                            <p className="text-sm text-white/60 leading-relaxed font-medium">{aim.ifYouMissDay}</p>
+                            <p className="text-sm text-white/60 leading-relaxed font-medium">
+                                {aim.ifYouMissDay || "Do not let one missed day derail your week. Complete exactly 50% of today's core tasks and return to full schedule tomorrow."}
+                            </p>
                         </div>
                     </div>
 
