@@ -2,12 +2,12 @@ importScripts('https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js
 importScripts('https://www.gstatic.com/firebasejs/10.14.0/firebase-messaging-compat.js');
 
 firebase.initializeApp({
-    apiKey: self.registration.scope.includes('localhost') ? "" : "PLACEHOLDER", // Not strictly needed for background SW
-    authDomain: "PLACEHOLDER",
-    projectId: "PLACEHOLDER",
-    storageBucket: "PLACEHOLDER",
-    messagingSenderId: "PLACEHOLDER", // Required
-    appId: "PLACEHOLDER",
+    apiKey: "AIzaSyDEjMFRqLcJg-FDUfKGg-FJSLLTLzDblRk",
+    authDomain: "webecomming.firebaseapp.com",
+    projectId: "webecomming",
+    storageBucket: "webecomming.firebasestorage.app",
+    messagingSenderId: "329368280885",
+    appId: "1:329368280885:web:2baf06c5f840747949367c",
 });
 
 const messaging = firebase.messaging();

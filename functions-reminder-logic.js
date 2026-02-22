@@ -1,8 +1,10 @@
 const functions = require("firebase-functions");
-const admin = require("firebase-admin");
 admin.initializeApp();
 
 /**
+ * NOTE: Use your VAPID Private Key (NCgz7OvAMQl1m2OJunAaKlQYgl8Xj5VjRE-DbfH1kCA) 
+ * if you are using a custom push service instead of Firebase Admin.
+ * 
  * Scheduled function to send personalized reminders daily at 8 PM.
  * Deploy via Firebase CLI: firebase deploy --only functions
  */
