@@ -11,18 +11,24 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-let app: FirebaseApp;
+let app: FirebaseApp | undefined;
 let auth: Auth;
 let db: Firestore;
 
-if (getApps().length === 0) {
-  app = initializeApp(firebaseConfig);
+// Only initialize if we have an API key (prevents build-time crashes on Vercel)
+const canInitialize = !!process.env.NEXT_PUBLIC_FIREBASE_API_KEY || typeof window !== "undefined";
+
+if (canInitialize) {
+  app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
   auth = getAuth(app);
   db = getFirestore(app);
 } else {
-  app = getApps()[0] as FirebaseApp;
-  auth = getAuth(app);
-  db = getFirestore(app);
+  // During static build (prerendering) on Vercel, if keys are missing, 
+  // we provide mock objects so the build doesn't crash.
+  auth = {
+    onAuthStateChanged: () => () => { }, // Mock unsubscribe
+  } as unknown as Auth;
+  db = {} as Firestore;
 }
 
 export { app, auth, db };
