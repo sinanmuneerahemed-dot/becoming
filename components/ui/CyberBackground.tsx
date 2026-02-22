@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useReducedMotion } from "framer-motion";
 
 export function AuroraBackground() {
   const [scrollY, setScrollY] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const shouldReduceMotion = useReducedMotion();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -26,46 +28,72 @@ export function AuroraBackground() {
 
   return (
     <div
-      className={`fixed inset-0 -z-10 overflow-hidden transition-all duration-1000 ${isModalOpen ? "blur-xl scale-110" : ""
+      className={`fixed inset-0 -z-10 transition-all duration-1000 ${isModalOpen ? "blur-xl scale-110" : ""
         }`}
       aria-hidden
-      style={{ backgroundColor: "#0b0f1a" }}
+      style={{
+        background: "linear-gradient(to bottom, #05070E, #0B1020)",
+      }}
     >
-      {/* Dynamic Mesh Blobs - Static Image Match */}
+      {/* Vignette Overlay */}
+      <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_150px_rgba(0,0,0,0.4)]" />
+
+      {/* Aurora Wave Container */}
+      <div className="absolute inset-0 overflow-hidden opacity-40">
+
+        {/* Wave 1 - Electric Blue */}
+        <div
+          className="absolute top-[20%] left-[-50%] w-[200%] h-[60%] blur-[120px] pointer-events-none"
+          style={{
+            background: "radial-gradient(ellipse at center, rgba(79, 140, 255, 0.4) 0%, transparent 70%)",
+            animation: shouldReduceMotion ? "none" : "aurora-drift-slow 30s linear infinite",
+            transform: `translateY(${scrollY * 0.05}px)`,
+          }}
+        />
+
+        {/* Wave 2 - Soft Violet */}
+        <div
+          className="absolute top-[30%] left-[-50%] w-[200%] h-[50%] blur-[100px] pointer-events-none"
+          style={{
+            background: "radial-gradient(ellipse at center, rgba(124, 77, 255, 0.35) 0%, transparent 65%)",
+            animation: shouldReduceMotion ? "none" : "aurora-drift-fast 25s linear infinite reverse",
+            transform: `translateY(${scrollY * -0.03}px)`,
+          }}
+        />
+
+        {/* Wave 3 - Subtle Cyan */}
+        <div
+          className="absolute top-[25%] left-[-50%] w-[200%] h-[55%] blur-[110px] pointer-events-none"
+          style={{
+            background: "radial-gradient(ellipse at center, rgba(49, 209, 255, 0.3) 0%, transparent 70%)",
+            animation: shouldReduceMotion ? "none" : "aurora-drift-medium 35s linear infinite",
+            transform: `translateY(${scrollY * 0.02}px)`,
+          }}
+        />
+      </div>
+
+      {/* Surface Reflection Glow (Bottom Center) */}
       <div
-        className="absolute top-[-15%] left-[-5%] w-[90%] h-[60%] opacity-60 blur-[100px] pointer-events-none"
-        style={{
-          background: "radial-gradient(ellipse at center, rgba(34, 197, 94, 0.6) 0%, transparent 75%)", // Toxic Green
-          transform: `rotate(-15deg) translateY(${scrollY * 0.08}px)`,
-        }}
-      />
-      <div
-        className="absolute top-[10%] right-[-10%] w-[80%] h-[70%] opacity-50 blur-[110px] pointer-events-none"
-        style={{
-          background: "radial-gradient(ellipse at center, rgba(6, 182, 212, 0.55) 0%, transparent 75%)", // Electric Cyan
-          transform: `rotate(-20deg) translateY(${scrollY * -0.05}px)`,
-        }}
-      />
-      <div
-        className="absolute bottom-[-15%] left-[10%] w-[85%] h-[65%] opacity-45 blur-[120px] pointer-events-none"
-        style={{
-          background: "radial-gradient(ellipse at center, rgba(37, 99, 235, 0.5) 0%, transparent 75%)", // Royal Blue
-          transform: `rotate(-10deg) translateY(${scrollY * 0.06}px)`,
-        }}
-      />
-      <div
-        className="absolute top-[30%] left-[20%] w-[60%] h-[40%] opacity-35 blur-[90px] pointer-events-none"
-        style={{
-          background: "radial-gradient(circle at center, rgba(16, 185, 129, 0.4) 0%, transparent 70%)", // Emerald Green Highlight
-          transform: `rotate(-25deg) translateY(${-scrollY * 0.03}px)`,
-        }}
+        className="absolute bottom-[-10%] left-1/2 -translate-x-1/2 w-[80%] h-[40%] bg-gradient-to-t from-white/5 to-transparent blur-[80px] pointer-events-none opacity-[0.08]"
       />
 
-      {/* Surface Texture / Grain */}
-      <div className="absolute inset-0 opacity-[0.25] noise-filter mix-blend-overlay pointer-events-none" />
-
-      {/* Subtle Grid Overlay */}
-      <div className="absolute inset-0 opacity-[0.03] bg-[linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] [background-size:120px_120px]" />
+      <style jsx global>{`
+        @keyframes aurora-drift-slow {
+          0% { transform: translateX(0); }
+          50% { transform: translateX(15%); }
+          100% { transform: translateX(0); }
+        }
+        @keyframes aurora-drift-medium {
+          0% { transform: translateX(10%); }
+          50% { transform: translateX(-5%); }
+          100% { transform: translateX(10%); }
+        }
+        @keyframes aurora-drift-fast {
+          0% { transform: translateX(-15%); }
+          50% { transform: translateX(5%); }
+          100% { transform: translateX(-15%); }
+        }
+      `}</style>
     </div>
   );
 }
