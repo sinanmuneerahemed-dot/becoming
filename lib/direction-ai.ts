@@ -116,6 +116,7 @@ const PLAN_RETRY_OPTIONS: GeminiGenerationOptions[] = [
 
 const MIN_TASKS_PER_DAY = 3;
 const DAILY_TARGET_REGEX = /(\d{1,3})\s*(chapter|chapters|page|pages|problem|problems|task|tasks|lesson|lessons|module|modules|video|videos|exercise|exercises|topic|topics|question|questions|set|sets|unit|units)\s*(?:(?:a|per)\s*day|\/\s*day|daily|every\s+day)\b/i;
+const TOTAL_TARGET_REGEX = /(\d{1,3})\s*(chapter|chapters|page|pages|problem|problems|task|tasks|lesson|lessons|module|modules|video|videos|exercise|exercises|topic|topics|question|questions|set|sets|unit|units)\b(?!\s*(per\s+day|a\s+day|\/\s*day|daily))/i;
 const CLOCK_TIME_PREFIX_REGEX = /^\s*(?:\d{1,2}:\d{2}\s*[\-\u2013\u2014]\s*\d{1,2}:\d{2}|\d{1,2}\s*(?:am|pm)\s*[\-\u2013\u2014]\s*\d{1,2}\s*(?:am|pm))\s*[\-\u2013\u2014]?\s*/i;
 const GENERIC_TASK_PATTERNS: RegExp[] = [
     /\bstay positive\b/i,
@@ -228,6 +229,21 @@ function parseDailyTarget(aimText: string): DailyTarget | null {
     };
 }
 
+function parseTotalTarget(aimText: string): DailyTarget | null {
+    const match = aimText.match(TOTAL_TARGET_REGEX);
+    if (!match) return null;
+
+    const count = Number(match[1]);
+    if (!Number.isFinite(count) || count < 1) return null;
+
+    const unitSingular = singularizeUnit(match[2]);
+    return {
+        count,
+        unitSingular,
+        unitPlural: pluralizeUnit(unitSingular),
+    };
+}
+
 function formatDailyTarget(target: DailyTarget): string {
     const unit = target.count === 1 ? target.unitSingular : target.unitPlural;
     return `${target.count} ${unit} per day`;
@@ -243,6 +259,18 @@ function buildTargetPartitions(target: DailyTarget): Array<{ from: number; to: n
         { from: 1, to: firstPartitionCount },
         { from: firstPartitionCount + 1, to: target.count },
     ];
+}
+
+function buildTotalRangeForDay(target: DailyTarget, day: number, totalDays = 7): { from: number; to: number } {
+    const perDay = Math.max(1, Math.ceil(target.count / totalDays));
+    const from = (day - 1) * perDay + 1;
+    const to = Math.min(target.count, day * perDay);
+    return { from, to };
+}
+
+function formatTotalRange(target: DailyTarget, range: { from: number; to: number }): string {
+    if (range.from >= range.to) return `${target.unitSingular} ${range.from}`;
+    return `${target.unitPlural} ${range.from}-${range.to}`;
 }
 
 function formatPartitionRange(target: DailyTarget, partition: { from: number; to: number }): string {
@@ -571,18 +599,29 @@ function buildReviewScheduleLines(
 function buildExecutionTasks(
     aimText: string,
     dailyTarget: DailyTarget | null,
+    totalTarget: DailyTarget | null,
     insight: AimInsight,
     day: number
 ): string[] {
     const primaryTheme = insight.themes[0] ?? "productivity";
     const themeLabel = formatThemeLabel(primaryTheme);
     const strategy = getThemeStrategy(primaryTheme);
+    const totalRange = totalTarget ? buildTotalRangeForDay(totalTarget, day) : null;
 
     if (dailyTarget) {
         return [
             `Hit today's target: ${formatDailyTarget(dailyTarget)} using both focus blocks.`,
             `Track proof per partition: count completed, skipped, and why (${themeLabel}).`,
             `Use ${strategy.review} to write one blocker and one concrete fix for tomorrow.`,
+        ];
+    }
+
+    if (totalRange) {
+        const rangeLabel = formatTotalRange(totalTarget!, totalRange);
+        return [
+            `Cover ${rangeLabel} with active recall and a 5-question self-quiz; stop only when you can teach it back.`,
+            `Create tight notes/flashcards for ${rangeLabel} (max 1 page or 8 cards) and tag unclear points.`,
+            `Log proof: quiz score and note link; write one adjustment for tomorrow based on hardest item (${themeLabel}).`,
         ];
     }
 
@@ -687,6 +726,7 @@ function buildReviewTasks(dailyTarget: DailyTarget | null, insight: AimInsight):
 function buildFallbackDays(aimText: string, goalType: GoalType): DayPlan[] {
     const durations = getFallbackDurations(goalType);
     const dailyTarget = parseDailyTarget(aimText);
+    const totalTarget = parseTotalTarget(aimText);
     const insight = analyzeAimInsight(aimText, goalType);
     const primaryThemeLabel = formatThemeLabel(insight.themes[0] ?? "productivity");
 
@@ -708,8 +748,8 @@ function buildFallbackDays(aimText: string, goalType: GoalType): DayPlan[] {
         const focus = `${baseFocus} (${primaryThemeLabel})`;
 
         const tasks = isReviewDay
-            ? buildReviewTasks(dailyTarget, insight)
-            : buildExecutionTasks(aimText, dailyTarget, insight, day);
+            ? buildReviewTasks(dailyTarget ?? totalTarget, insight)
+            : buildExecutionTasks(aimText, dailyTarget, totalTarget, insight, day);
 
         return {
             day,
