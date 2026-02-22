@@ -277,8 +277,8 @@ export interface WeeklyAim {
   completionResult?: "yes" | "partially" | "no";
   reflectionSummary?: string;
   checkpoints?: {
-    day3: string;
-    day7: string;
+    day3?: string;
+    day7?: string;
   };
   ifYouMissDay?: string;
   goalInterpretation?: string;

@@ -20,11 +20,11 @@ export interface DirectionPlan {
     planTitle: string;
     planRaw: string;
     days: DayPlan[];
-    checkpoints: {
-        day3: string;
-        day7: string;
+    checkpoints?: {
+        day3?: string;
+        day7?: string;
     };
-    ifYouMissDay: string;
+    ifYouMissDay?: string;
     goalInterpretation?: string;
     strategicBreakdown?: string;
     expectedOutcome?: string;
@@ -62,11 +62,11 @@ interface StructuredPlanPayload {
 interface NormalizedPlan {
     planTitle: string;
     days: DayPlan[];
-    checkpoints: {
-        day3: string;
-        day7: string;
+    checkpoints?: {
+        day3?: string;
+        day7?: string;
     };
-    ifYouMissDay: string;
+    ifYouMissDay?: string;
     goalInterpretation?: string;
     strategicBreakdown?: string;
     expectedOutcome?: string;
@@ -836,13 +836,13 @@ function buildPlanRaw(normalized: NormalizedPlan): string {
     });
 
     lines.push("Checkpoint (Day 3):");
-    lines.push(normalized.checkpoints.day3);
+    lines.push(normalized.checkpoints?.day3 ?? "Evaluate initial momentum and adjust workload if needed.");
     lines.push("");
     lines.push("Checkpoint (Day 7):");
-    lines.push(normalized.checkpoints.day7);
+    lines.push(normalized.checkpoints?.day7 ?? "Final review of deliverables and sustainability check.");
     lines.push("");
     lines.push("If You Miss a Day:");
-    lines.push(normalized.ifYouMissDay);
+    lines.push(normalized.ifYouMissDay ?? "Do not let one missed day derail your week. Complete exactly 50% of today's core tasks and return to full schedule tomorrow.");
 
     return lines.join("\n").trim();
 }
@@ -1160,10 +1160,10 @@ function normalizeStructuredPlan(input: StructuredPlanPayload, aimText: string):
         planTitle,
         days,
         checkpoints: {
-            day3: sanitizeText(checkpointsRaw.day3, fallback.checkpoints.day3),
-            day7: sanitizeText(checkpointsRaw.day7, fallback.checkpoints.day7),
+            day3: sanitizeText(checkpointsRaw.day3, fallback.checkpoints?.day3 ?? "Evaluate initial momentum and adjust workload if needed."),
+            day7: sanitizeText(checkpointsRaw.day7, fallback.checkpoints?.day7 ?? "Final review of deliverables and sustainability check."),
         },
-        ifYouMissDay: sanitizeText(input.ifYouMissDay, fallback.ifYouMissDay),
+        ifYouMissDay: sanitizeText(input.ifYouMissDay, fallback.ifYouMissDay ?? "Do not let one missed day derail your week. Complete exactly 50% of today's core tasks and return to full schedule tomorrow."),
         goalInterpretation: sanitizeText(input.goalInterpretation),
         strategicBreakdown: sanitizeText(input.strategicBreakdown),
         expectedOutcome: sanitizeText(input.expectedOutcome),
