@@ -5,103 +5,84 @@
 @layer base {
   html {
     @apply scroll-smooth;
+    background-color: #05070e;
   }
 
   body {
-    background-color: #0b0f1a;
+    position: relative;
+    min-height: 100vh;
+    background: linear-gradient(180deg, #05070e 0%, #0b1020 100%);
+    box-shadow: inset 0 0 140px rgba(0, 0, 0, 0.55);
+    overflow-x: clip;
     @apply text-white antialiased;
   }
+
+  /* Aurora backdrop */
+  body::before,
+  body::after {
+    content: "";
+    position: fixed;
+    inset: -22vh -28vw;
+    pointer-events: none;
+    will-change: transform;
+    mix-blend-mode: screen;
+  }
+
+  /* Main flowing aurora */
+  body::before {
+    z-index: -1;
+    background:
+      radial-gradient(140% 70% at 52% 55%, rgba(79, 140, 255, 0.55) 0%, rgba(79, 140, 255, 0.07) 55%, transparent 70%),
+      radial-gradient(130% 65% at 38% 52%, rgba(124, 77, 255, 0.38) 0%, rgba(124, 77, 255, 0.06) 58%, transparent 78%),
+      radial-gradient(160% 80% at 66% 60%, rgba(49, 209, 255, 0.32) 0%, rgba(49, 209, 255, 0.05) 62%, transparent 80%);
+    filter: blur(72px);
+    opacity: 0.9;
+    transform: translate3d(-6%, 0, 0) scale(1.06);
+    animation: aurora-drift 27s ease-in-out infinite alternate;
+  }
+
+  /* Secondary sheen + ground reflection */
+  body::after {
+    z-index: -2;
+    background:
+      radial-gradient(170% 70% at 48% 57%, rgba(79, 140, 255, 0.18) 0%, rgba(79, 140, 255, 0) 60%),
+      radial-gradient(120% 55% at 62% 54%, rgba(124, 77, 255, 0.14) 0%, rgba(124, 77, 255, 0) 62%),
+      radial-gradient(95% 55% at 50% 96%, rgba(79, 140, 255, 0.08) 0%, rgba(79, 140, 255, 0.0) 68%),
+      radial-gradient(55% 40% at 43% 90%, rgba(49, 209, 255, 0.07) 0%, rgba(49, 209, 255, 0.0) 75%),
+      radial-gradient(42% 36% at 58% 92%, rgba(255, 167, 91, 0.06) 0%, rgba(255, 167, 91, 0.0) 78%);
+    filter: blur(95px);
+    opacity: 0.8;
+    transform: translate3d(7%, 0, 0) scale(1.03);
+    animation: aurora-parallax 32s ease-in-out infinite alternate;
+  }
 }
 
-@keyframes mesh-1 {
+@keyframes aurora-drift {
   0% {
-    transform: translate(0, 0) rotate(0deg) scale(1.2);
+    transform: translate3d(-8%, 0, 0) scale(1.06);
   }
 
   50% {
-    transform: translate(15%, 10%) rotate(180deg) scale(1);
+    transform: translate3d(10%, 0, 0) scale(1.08);
   }
 
   100% {
-    transform: translate(0, 0) rotate(360deg) scale(1.2);
+    transform: translate3d(-6%, 0, 0) scale(1.04);
   }
 }
 
-@keyframes mesh-2 {
+@keyframes aurora-parallax {
   0% {
-    transform: translate(0, 0) rotate(0deg) scale(1);
+    transform: translate3d(8%, 0, 0) scale(1.03);
   }
 
   50% {
-    transform: translate(-10%, -15%) rotate(-120deg) scale(1.3);
+    transform: translate3d(-7%, 0, 0) scale(1.05);
   }
 
   100% {
-    transform: translate(0, 0) rotate(-360deg) scale(1);
+    transform: translate3d(6%, 0, 0) scale(1.02);
   }
-}
-
-@keyframes mesh-3 {
-  0% {
-    transform: translate(0, 0) scale(1.1);
-  }
-
-  50% {
-    transform: translate(10%, -10%) scale(0.9);
-  }
-
-  100% {
-    transform: translate(0, 0) scale(1.1);
-  }
-}
-
-@keyframes grain-shift {
-
-  0%,
-  100% {
-    transform: translate(0, 0);
-  }
-
-  10% {
-    transform: translate(-5%, -10%);
-  }
-
-  20% {
-    transform: translate(-15%, 5%);
-  }
-
-  30% {
-    transform: translate(7%, -25%);
-  }
-
-  40% {
-    transform: translate(-5%, 25%);
-  }
-
-  50% {
-    transform: translate(-15%, 10%);
-  }
-
-  60% {
-    transform: translate(15%, 0%);
-  }
-
-  70% {
-    transform: translate(0%, 15%);
-  }
-
-  80% {
-    transform: translate(3%, 35%);
-  }
-
-  90% {
-    transform: translate(-10%, 10%);
-  }
-}
-
-.noise-filter {
-  filter: contrast(170%) brightness(1000%);
-  background: url("data:image/svg+xml,%3Csvg viewBox='0 0 250 250' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -113,4 +94,9 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+.noise-filter {
+  filter: contrast(170%) brightness(1000%);
+  background: url("data:image/svg+xml,%3Csvg viewBox='0 0 250 250' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
 }
