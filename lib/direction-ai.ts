@@ -115,7 +115,6 @@ const PLAN_RETRY_OPTIONS: GeminiGenerationOptions[] = [
 ];
 
 const MIN_TASKS_PER_DAY = 3;
-const MIN_SCHEDULE_LINES = 3;
 const DAILY_TARGET_REGEX = /(\d{1,3})\s*(chapter|chapters|page|pages|problem|problems|task|tasks|lesson|lessons|module|modules|video|videos|exercise|exercises|topic|topics|question|questions|set|sets|unit|units)\s*(?:(?:a|per)\s*day|\/\s*day|daily|every\s+day)\b/i;
 const CLOCK_TIME_PREFIX_REGEX = /^\s*(?:\d{1,2}:\d{2}\s*[\-\u2013\u2014]\s*\d{1,2}:\d{2}|\d{1,2}\s*(?:am|pm)\s*[\-\u2013\u2014]\s*\d{1,2}\s*(?:am|pm))\s*[\-\u2013\u2014]?\s*/i;
 const GENERIC_TASK_PATTERNS: RegExp[] = [
@@ -142,34 +141,6 @@ function sanitizeList(value: unknown): string[] {
     return value
         .map((item) => (typeof item === "string" ? item.trim() : ""))
         .filter((item) => item.length > 0);
-}
-
-function normalizeScheduleLine(line: string): string {
-    const normalized = line
-        .replace(/[\u2013\u2014]/g, "-")
-        .replace(/\s+/g, " ")
-        .trim();
-
-    if (!normalized) return "";
-    const withoutClockRange = normalized.replace(CLOCK_TIME_PREFIX_REGEX, "").trim();
-    return withoutClockRange || normalized;
-}
-
-function hasDurationAndBreak(line: string): boolean {
-    const lower = line.toLowerCase();
-    const durationCount = line.match(/\d+\s*(?:m|min|mins|minute|minutes)\b/gi)?.length ?? 0;
-    return /\bbreak\b/.test(lower) && durationCount >= 2;
-}
-
-function normalizeModelBlockLine(line: string, blockIndex: number, fallbackLine: string): string {
-    const normalized = normalizeScheduleLine(line);
-    if (!normalized) return fallbackLine;
-
-    const withBlockPrefix = /^block\s*\d+/i.test(normalized)
-        ? normalized
-        : `Block ${blockIndex}: ${normalized}`;
-
-    return hasDurationAndBreak(withBlockPrefix) ? withBlockPrefix : fallbackLine;
 }
 
 function splitEstimatedTime(estimatedTime: string): { active: string; rest: string } {
@@ -714,7 +685,6 @@ function buildReviewTasks(dailyTarget: DailyTarget | null, insight: AimInsight):
 }
 
 function buildFallbackDays(aimText: string, goalType: GoalType): DayPlan[] {
-    const blocks = getGoalBlocks(goalType);
     const durations = getFallbackDurations(goalType);
     const dailyTarget = parseDailyTarget(aimText);
     const insight = analyzeAimInsight(aimText, goalType);
@@ -737,10 +707,6 @@ function buildFallbackDays(aimText: string, goalType: GoalType): DayPlan[] {
                                     : "Consolidate and evaluate";
         const focus = `${baseFocus} (${primaryThemeLabel})`;
 
-        const schedule = isReviewDay
-            ? buildReviewScheduleLines(aimText, blocks, durations, dailyTarget, insight)
-            : buildExecutionScheduleLines(aimText, blocks, durations, dailyTarget, insight);
-
         const tasks = isReviewDay
             ? buildReviewTasks(dailyTarget, insight)
             : buildExecutionTasks(aimText, dailyTarget, insight, day);
@@ -748,7 +714,7 @@ function buildFallbackDays(aimText: string, goalType: GoalType): DayPlan[] {
         return {
             day,
             focus,
-            schedule,
+            schedule: [],
             tasks,
             estimatedTime,
         };
@@ -848,7 +814,6 @@ JSON schema:
     {
       "day": 1,
       "focus": "string",
-      "schedule": ["Block 1 (Block Name - Focus 35m + Break 10m): exact action"],
       "tasks": ["measurable task", "measurable task", "measurable task"],
       "totalActiveTime": "string",
       "totalRest": "string"
@@ -863,13 +828,11 @@ JSON schema:
 
 Critical constraints:
 - Exactly 7 day objects with day = 1..7.
-- Each day must include 3-5 schedule lines and exactly 3 tasks.
-- Do not output wall-clock schedules. No HH:MM ranges and no AM/PM times.
-- Every schedule line must include focus duration and break duration in minutes.
-- Use goal-specific block names; avoid generic labels like "Session 1".
+- No block schedules; provide exactly 3 action bullets per day, each a single, concise sentence.
+- Do not use labels like "Block 1/2/3" or wall-clock times.
 - Never assume an academic goal unless the aim explicitly asks for study/exam work.
 - For non-academic goals, do not use chapter/revision/exam/subject/homework language.
-- If the aim includes a numeric daily target (example: "4 chapters a day"), partition that quantity across 2-3 blocks and label each partition clearly.
+- If the aim includes a numeric daily target (example: "4 chapters a day"), partition that quantity across 2-3 chunks inside the 3 actions and label each chunk clearly.
 - Avoid generic coaching statements like "stay positive", "do your best", or "be consistent".
 - Every task must be specific and measurable with a clear output, count, or completion signal.
 - Use a supportive coaching tone: direct, calm, and practical.
@@ -1079,28 +1042,8 @@ function normalizeStructuredPlan(input: StructuredPlanPayload, aimText: string):
 
         const fallbackDay = fallback.days[dayNum - 1];
         const focus = sanitizeText((rawDay as StructuredPlanDay).focus, fallbackDay.focus);
-        const fallbackSchedule = fallbackDay.schedule ?? [];
-        const scheduleFromModel = sanitizeList((rawDay as StructuredPlanDay).schedule)
-            .slice(0, 8)
-            .map((line, index) => {
-                const fallbackLine = fallbackSchedule.length > 0
-                    ? fallbackSchedule[index % fallbackSchedule.length]
-                    : `Block ${index + 1} (Focus 25m + Break 5m): fallback task`;
-                return normalizeModelBlockLine(line, index + 1, fallbackLine);
-            })
-            .filter((line) => line.length > 0)
-            .slice(0, 8);
-
+        const scheduleFromModel = sanitizeList((rawDay as StructuredPlanDay).schedule).slice(0, 3);
         const normalizedSchedule = [...scheduleFromModel];
-        while (
-            normalizedSchedule.length < MIN_SCHEDULE_LINES &&
-            fallbackDay.schedule &&
-            fallbackDay.schedule.length > 0
-        ) {
-            normalizedSchedule.push(
-                fallbackDay.schedule[normalizedSchedule.length % fallbackDay.schedule.length]
-            );
-        }
 
         const tasksFromModel = sanitizeList((rawDay as StructuredPlanDay).tasks).slice(0, 6);
         const normalizedTasks = [...tasksFromModel];
@@ -1179,9 +1122,7 @@ function isValidDirectionPlan(days: DayPlan[], aimText: string): boolean {
             day.day >= 1 &&
             day.day <= 7 &&
             day.focus.trim().length > 0 &&
-            day.tasks.length >= MIN_TASKS_PER_DAY &&
-            (day.schedule?.length ?? 0) >= MIN_SCHEDULE_LINES &&
-            (day.schedule ?? []).every((line) => hasDurationAndBreak(line))
+            day.tasks.length >= MIN_TASKS_PER_DAY
         ) &&
         weakTaskCount === 0 &&
         measurableTaskDays >= 6 &&
