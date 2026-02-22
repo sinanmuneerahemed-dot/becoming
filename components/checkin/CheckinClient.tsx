@@ -40,7 +40,7 @@ function getDayNumber(startDate: string): number {
   const start = new Date(startDate);
   const today = new Date(getTodayDateStr());
   const diff = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-  return Math.min(Math.max(diff + 1, 1), 7);
+  return diff + 1; // No more cap at 7; Day 8 means expired.
 }
 
 interface CheckinClientProps {
@@ -77,11 +77,23 @@ export function CheckinClient({ step }: CheckinClientProps) {
   // Load active aim on mount (real-time)
   useEffect(() => {
     if (!user) return;
-    const unsubscribe = subscribeToActiveWeeklyAim(user.uid, (aim) => {
-      setActiveAim(aim);
-      // If Day 7 has been reached and status is still active, trigger completion flow
-      if (aim && getDayNumber(aim.startDate) >= 7 && stepNum === 1) {
-        setShowCompletionFlow(true);
+    const unsubscribe = subscribeToActiveWeeklyAim(user.uid, async (aim) => {
+      if (aim) {
+        const day = getDayNumber(aim.startDate);
+        // Auto-close expired aims (Day 8+)
+        if (day >= 8) {
+          console.log("[Aim] Closing expired aim:", aim.id);
+          await closeActiveWeeklyAims(user.uid);
+          return; // The listener will fire again with null
+        }
+
+        setActiveAim(aim);
+        // If Day 7 has been reached and status is still active, trigger completion flow
+        if (day >= 7 && stepNum === 1) {
+          setShowCompletionFlow(true);
+        }
+      } else {
+        setActiveAim(null);
       }
     });
 
@@ -134,6 +146,14 @@ export function CheckinClient({ step }: CheckinClientProps) {
       setSaving(true);
       try {
         await saveEntry(user.uid, getTodayDateStr(), merged, true);
+
+        // Wait for activeAim to finish loading if it's still undefined
+        if (activeAim === undefined) {
+          router.push("/app"); // Fallback redirect if data is slow
+          toast.success("Check-in complete!");
+          return;
+        }
+
         // Step 9 is conditional: only if no active aim exists
         if (activeAim) {
           router.push("/app");

@@ -14,7 +14,7 @@ function getDayNumber(startDate: string): number {
     const diff = Math.floor(
         (today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)
     );
-    return Math.min(Math.max(diff + 1, 1), 7);
+    return diff + 1; // Cap removed for expiration logic
 }
 
 export function SevenDayDirectionCard() {
