@@ -1,41 +1,12 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 
 export function AuroraBackground() {
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-  const [isTouch, setIsTouch] = useState(false);
   const [scrollY, setScrollY] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [hasTouch, setHasTouch] = useState(false);
-  const glowRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-  const requestRef = useRef<number>();
 
   useEffect(() => {
-    setHasTouch('ontouchstart' in window);
-
-    const handleMouseMove = (e: MouseEvent) => {
-      setMousePos({ x: e.clientX, y: e.clientY });
-    };
-
-    const handleTouchMove = (e: TouchEvent) => {
-      if (e.touches[0]) {
-        setMousePos({ x: e.touches[0].clientX, y: e.touches[0].clientY });
-        setIsTouch(true);
-      }
-    };
-
-    const handleTouchStart = (e: TouchEvent) => {
-      if (e.touches[0]) {
-        setMousePos({ x: e.touches[0].clientX, y: e.touches[0].clientY });
-        setIsTouch(true);
-      }
-    };
-
-    const handleTouchEnd = () => {
-      setIsTouch(false);
-    };
-
     const handleScroll = () => {
       setScrollY(window.scrollY);
     };
@@ -45,44 +16,13 @@ export function AuroraBackground() {
     });
 
     observer.observe(document.body, { attributes: true, attributeFilter: ["style"] });
-
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("touchstart", handleTouchStart);
-    window.addEventListener("touchmove", handleTouchMove, { passive: true });
-    window.addEventListener("touchend", handleTouchEnd);
     window.addEventListener("scroll", handleScroll, { passive: true });
 
     return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("touchstart", handleTouchStart);
-      window.removeEventListener("touchmove", handleTouchMove);
-      window.removeEventListener("touchend", handleTouchEnd);
       window.removeEventListener("scroll", handleScroll);
       observer.disconnect();
     };
   }, []);
-
-  // Smooth easing for the glow and reactive movement
-  useEffect(() => {
-    const animate = () => {
-      glowRef.current.x += (mousePos.x - glowRef.current.x) * 0.08;
-      glowRef.current.y += (mousePos.y - glowRef.current.y) * 0.08;
-
-      const glowElement = document.getElementById("cursor-glow");
-      if (glowElement) {
-        glowElement.style.transform = `translate(${glowRef.current.x - 250}px, ${glowRef.current.y - 250}px)`;
-      }
-      requestRef.current = requestAnimationFrame(animate);
-    };
-    requestRef.current = requestAnimationFrame(animate);
-    return () => {
-      if (requestRef.current) cancelAnimationFrame(requestRef.current);
-    };
-  }, [mousePos]);
-
-  // Mouse reactive shift values
-  const moveX = (mousePos.x / (typeof window !== 'undefined' ? window.innerWidth : 1) - 0.5) * 50;
-  const moveY = (mousePos.y / (typeof window !== 'undefined' ? window.innerHeight : 1) - 0.5) * 50;
 
   return (
     <div
@@ -91,53 +31,41 @@ export function AuroraBackground() {
       aria-hidden
       style={{ backgroundColor: "#0b0f1a" }}
     >
-      {/* Dynamic Mesh Blobs - Vibrant Image Match */}
+      {/* Dynamic Mesh Blobs - Static Image Match */}
       <div
         className="absolute top-[-15%] left-[-5%] w-[90%] h-[60%] opacity-60 blur-[100px] pointer-events-none"
         style={{
           background: "radial-gradient(ellipse at center, rgba(34, 197, 94, 0.6) 0%, transparent 75%)", // Toxic Green
-          transform: `rotate(-15deg) translate(${moveX * 0.4}px, ${moveY * 0.4 + scrollY * 0.08}px)`,
+          transform: `rotate(-15deg) translateY(${scrollY * 0.08}px)`,
         }}
       />
       <div
         className="absolute top-[10%] right-[-10%] w-[80%] h-[70%] opacity-50 blur-[110px] pointer-events-none"
         style={{
           background: "radial-gradient(ellipse at center, rgba(6, 182, 212, 0.55) 0%, transparent 75%)", // Electric Cyan
-          transform: `rotate(-20deg) translate(${moveX * -0.3}px, ${moveY * -0.3 + scrollY * -0.05}px)`,
+          transform: `rotate(-20deg) translateY(${scrollY * -0.05}px)`,
         }}
       />
       <div
         className="absolute bottom-[-15%] left-[10%] w-[85%] h-[65%] opacity-45 blur-[120px] pointer-events-none"
         style={{
           background: "radial-gradient(ellipse at center, rgba(37, 99, 235, 0.5) 0%, transparent 75%)", // Royal Blue
-          transform: `rotate(-10deg) translate(${moveX * 0.2}px, ${moveY * 0.2 + scrollY * 0.06}px)`,
+          transform: `rotate(-10deg) translateY(${scrollY * 0.06}px)`,
         }}
       />
       <div
         className="absolute top-[30%] left-[20%] w-[60%] h-[40%] opacity-35 blur-[90px] pointer-events-none"
         style={{
           background: "radial-gradient(circle at center, rgba(16, 185, 129, 0.4) 0%, transparent 70%)", // Emerald Green Highlight
-          transform: `rotate(-25deg) translate(${moveX * -0.2}px, ${moveY * 0.2 - scrollY * 0.03}px)`,
+          transform: `rotate(-25deg) translateY(${-scrollY * 0.03}px)`,
         }}
       />
 
       {/* Surface Texture / Grain */}
-      <div className="absolute inset-0 opacity-[0.25] noise-filter mix-blend-overlay pointer-events-none"
-      />
+      <div className="absolute inset-0 opacity-[0.25] noise-filter mix-blend-overlay pointer-events-none" />
 
       {/* Subtle Grid Overlay */}
       <div className="absolute inset-0 opacity-[0.03] bg-[linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] [background-size:120px_120px]" />
-
-      {/* Interactive Cursor Glow */}
-      <div
-        id="cursor-glow"
-        className={`fixed top-0 left-0 w-[500px] h-[500px] rounded-full pointer-events-none transition-opacity duration-500`}
-        style={{
-          background: "radial-gradient(circle at center, rgba(255, 255, 255, 0.12) 0%, transparent 70%)",
-          opacity: isTouch || !hasTouch ? 1 : 0,
-          willChange: "transform",
-        }}
-      />
     </div>
   );
 }
