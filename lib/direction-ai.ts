@@ -20,6 +20,16 @@ export interface DirectionPlan {
     planTitle: string;
     planRaw: string;
     days: DayPlan[];
+    checkpoints: {
+        day3: string;
+        day7: string;
+    };
+    ifYouMissDay: string;
+    goalInterpretation?: string;
+    strategicBreakdown?: string;
+    expectedOutcome?: string;
+    riskAdvice?: string;
+    behavioralInsights?: string[];
 }
 
 interface GeminiGenerationOptions {
@@ -42,6 +52,11 @@ interface StructuredPlanPayload {
     days?: unknown;
     checkpoints?: unknown;
     ifYouMissDay?: unknown;
+    goalInterpretation?: unknown;
+    strategicBreakdown?: unknown;
+    expectedOutcome?: unknown;
+    riskAdvice?: unknown;
+    behavioralInsights?: unknown;
 }
 
 interface NormalizedPlan {
@@ -52,6 +67,11 @@ interface NormalizedPlan {
         day7: string;
     };
     ifYouMissDay: string;
+    goalInterpretation?: string;
+    strategicBreakdown?: string;
+    expectedOutcome?: string;
+    riskAdvice?: string;
+    behavioralInsights?: string[];
 }
 
 type GoalType =
@@ -109,9 +129,9 @@ interface AimInsight {
 }
 
 const PLAN_RETRY_OPTIONS: GeminiGenerationOptions[] = [
-    { temperature: 0.25, maxOutputTokens: 1700, responseMimeType: "application/json" },
-    { temperature: 0.15, maxOutputTokens: 1400, responseMimeType: "application/json" },
-    { temperature: 0.1, maxOutputTokens: 1200, responseMimeType: "application/json" },
+    { temperature: 0.25, maxOutputTokens: 2500, responseMimeType: "application/json" },
+    { temperature: 0.15, maxOutputTokens: 2000, responseMimeType: "application/json" },
+    { temperature: 0.1, maxOutputTokens: 1800, responseMimeType: "application/json" },
 ];
 
 const MIN_TASKS_PER_DAY = 3;
@@ -850,15 +870,20 @@ Return ONLY valid JSON. No markdown. No explanations.
 JSON schema:
 {
   "planTitle": "string",
+  "goalInterpretation": "Deep explanation of what the goal truly means and success profile in 7 days (2-3 sentences)",
+  "strategicBreakdown": "Psychological/Strategic analysis of what must happen and core risks (2-3 sentences)",
   "days": [
     {
       "day": 1,
       "focus": "string",
-      "tasks": ["measurable task", "measurable task", "measurable task"],
+      "tasks": ["measurable task + output", "measurable task + output", "measurable task + output"],
       "totalActiveTime": "string",
       "totalRest": "string"
     }
   ],
+  "expectedOutcome": "Tangible progress and momentum level after 7 days (2-3 sentences)",
+  "riskAdvice": "Specific warning signals and how to correct course (2-3 sentences)",
+  "behavioralInsights": ["Insight 1", "Insight 2", "Insight 3"],
   "checkpoints": {
     "day3": "2-3 sentences",
     "day7": "2-3 sentences"
@@ -867,15 +892,14 @@ JSON schema:
 }
 
 Critical constraints:
+- persona: You are the Intelligence Engine of BECOMING. Your job is not to motivate, but to analyze and optimize.
 - Exactly 7 day objects with day = 1..7.
 - No block schedules; provide exactly 3 action bullets per day, each a single, concise sentence.
-- Do not use labels like "Block 1/2/3" or wall-clock times.
-- Never assume an academic goal unless the aim explicitly asks for study/exam work.
-- For non-academic goals, do not use chapter/revision/exam/subject/homework language.
-- If the aim includes a numeric daily target (example: "4 chapters a day"), partition that quantity across 2-3 chunks inside the 3 actions and label each chunk clearly.
-- Avoid generic coaching statements like "stay positive", "do your best", or "be consistent".
 - Every task must be specific and measurable with a clear output, count, or completion signal.
-- Use a supportive coaching tone: direct, calm, and practical.
+- Behavioral Insights: 3-5 powerful psychological insights about discipline, identity, and growth (NOT motivational quotes).
+- Do not use labels like "Block 1/2/3" or wall-clock times.
+- Avoid generic coaching statements like "stay positive", "do your best".
+- Use an intelligent, calm, performance-focused tone.
 
 Behavioral adaptation:
 - Typical focus block length: ${sessionLen} minutes.
@@ -1131,6 +1155,11 @@ function normalizeStructuredPlan(input: StructuredPlanPayload, aimText: string):
             day7: sanitizeText(checkpointsRaw.day7, fallback.checkpoints.day7),
         },
         ifYouMissDay: sanitizeText(input.ifYouMissDay, fallback.ifYouMissDay),
+        goalInterpretation: sanitizeText(input.goalInterpretation),
+        strategicBreakdown: sanitizeText(input.strategicBreakdown),
+        expectedOutcome: sanitizeText(input.expectedOutcome),
+        riskAdvice: sanitizeText(input.riskAdvice),
+        behavioralInsights: sanitizeList(input.behavioralInsights),
     };
 }
 
@@ -1238,6 +1267,13 @@ export async function generateDirectionPlan(
                 planTitle: normalized.planTitle,
                 planRaw: buildPlanRaw(normalized),
                 days: normalized.days,
+                checkpoints: normalized.checkpoints,
+                ifYouMissDay: normalized.ifYouMissDay,
+                goalInterpretation: normalized.goalInterpretation,
+                strategicBreakdown: normalized.strategicBreakdown,
+                expectedOutcome: normalized.expectedOutcome,
+                riskAdvice: normalized.riskAdvice,
+                behavioralInsights: normalized.behavioralInsights,
             };
         } catch (err) {
             lastError = err;
@@ -1262,6 +1298,8 @@ export function buildFallbackPlan(aimText: string): DirectionPlan {
         planTitle: normalized.planTitle,
         planRaw: buildPlanRaw(normalized),
         days: normalized.days,
+        checkpoints: normalized.checkpoints,
+        ifYouMissDay: normalized.ifYouMissDay,
     };
 }
 

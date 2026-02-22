@@ -166,12 +166,23 @@ export function CheckinClient({ step }: CheckinClientProps) {
           planRaw: fallback.planRaw,
           planTitle: fallback.planTitle,
           days: fallback.days,
+          checkpoints: fallback.checkpoints,
+          ifYouMissDay: fallback.ifYouMissDay,
         });
 
         // Step 2: Try AI generation — if it fails, fallback plan stays
         try {
-          const { planTitle, planRaw, days } = await generateDirectionPlan(aimText, ctx);
-          await updateWeeklyAimPlan(user.uid, aimId, planRaw, planTitle, days);
+          const normalized = await generateDirectionPlan(aimText, ctx);
+          const { planTitle, planRaw, days } = normalized;
+
+          await updateWeeklyAimPlan(user.uid, aimId, planRaw, planTitle, days, {
+            goalInterpretation: normalized.goalInterpretation,
+            strategicBreakdown: normalized.strategicBreakdown,
+            expectedOutcome: normalized.expectedOutcome,
+            riskAdvice: normalized.riskAdvice,
+            behavioralInsights: normalized.behavioralInsights,
+          });
+
           toast.success("Your 7-Day Direction is set!");
         } catch (aiErr) {
           console.error("[Gemini] Plan generation failed, keeping fallback:", aiErr);

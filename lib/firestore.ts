@@ -276,6 +276,16 @@ export interface WeeklyAim {
   days: DayPlan[];
   completionResult?: "yes" | "partially" | "no";
   reflectionSummary?: string;
+  checkpoints: {
+    day3: string;
+    day7: string;
+  };
+  ifYouMissDay: string;
+  goalInterpretation?: string;
+  strategicBreakdown?: string;
+  expectedOutcome?: string;
+  riskAdvice?: string;
+  behavioralInsights?: string[];
 }
 
 export async function saveWeeklyAim(
@@ -344,9 +354,21 @@ export async function updateWeeklyAimPlan(
   aimId: string,
   planRaw: string,
   planTitle: string,
-  days: DayPlan[]
+  days: DayPlan[],
+  extras?: {
+    goalInterpretation?: string;
+    strategicBreakdown?: string;
+    expectedOutcome?: string;
+    riskAdvice?: string;
+    behavioralInsights?: string[];
+  }
 ): Promise<void> {
   const ref = doc(db, "users", uid, "weeklyAims", aimId);
-  await updateDoc(ref, { planRaw, planTitle, days });
+  await updateDoc(ref, {
+    planRaw,
+    planTitle,
+    days,
+    ...extras,
+  });
 }
 
