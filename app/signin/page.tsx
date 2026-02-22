@@ -41,7 +41,6 @@ export default function SignInPage() {
     <div className="min-h-screen flex items-center justify-center px-4 py-8">
       <GlassCard className="w-full max-w-md p-6 sm:p-8">
         <div className="text-center space-y-6">
-          <img src="/logo.png" alt="Becoming" className="h-14 mx-auto" />
           <h1 className="text-2xl font-bold tracking-wider">BECOMING</h1>
           <p className="text-white/70 text-sm">
             Sign in to start your daily check-in

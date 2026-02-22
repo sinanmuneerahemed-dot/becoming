@@ -32,7 +32,6 @@ export function Hero() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: shouldReduceMotion ? 0 : 0.6 }}
       >
-        <img src="/logo.png" alt="Becoming" className="h-20 sm:h-24 md:h-28" />
         <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-[0.1em] sm:tracking-[0.2em]">BECOMING</h1>
       </motion.div>
       <div className="min-h-12 flex items-center justify-center mb-8 sm:mb-12 px-2">
