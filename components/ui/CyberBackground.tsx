@@ -91,46 +91,46 @@ export function AuroraBackground() {
       aria-hidden
       style={{ backgroundColor: "#0b0f1a" }}
     >
-      {/* Dynamic Mesh Blobs */}
+      {/* Dynamic Mesh Blobs - Vibrant Image Match */}
       <div
-        className="absolute top-[-10%] left-[-10%] w-[70%] h-[70%] opacity-50 blur-[120px] pointer-events-none"
+        className="absolute top-[-15%] left-[-5%] w-[90%] h-[60%] opacity-60 blur-[100px] pointer-events-none"
         style={{
-          background: "radial-gradient(circle at center, rgba(79, 70, 229, 0.6) 0%, transparent 70%)", // Indigo
-          animation: "mesh-1 20s linear infinite",
-          transform: `translate(${moveX * 0.5}px, ${moveY * 0.5 + scrollY * 0.1}px)`,
+          background: "radial-gradient(ellipse at center, rgba(34, 197, 94, 0.6) 0%, transparent 75%)", // Toxic Green
+          animation: "mesh-1 22s linear infinite",
+          transform: `rotate(-15deg) translate(${moveX * 0.4}px, ${moveY * 0.4 + scrollY * 0.08}px)`,
         }}
       />
       <div
-        className="absolute top-[10%] right-[-10%] w-[60%] h-[60%] opacity-40 blur-[100px] pointer-events-none"
+        className="absolute top-[10%] right-[-10%] w-[80%] h-[70%] opacity-50 blur-[110px] pointer-events-none"
         style={{
-          background: "radial-gradient(circle at center, rgba(219, 39, 119, 0.5) 0%, transparent 70%)", // Magenta
-          animation: "mesh-2 25s linear infinite",
-          transform: `translate(${moveX * -0.3}px, ${moveY * -0.3 + scrollY * -0.05}px)`,
+          background: "radial-gradient(ellipse at center, rgba(6, 182, 212, 0.55) 0%, transparent 75%)", // Electric Cyan
+          animation: "mesh-2 26s linear infinite",
+          transform: `rotate(-20deg) translate(${moveX * -0.3}px, ${moveY * -0.3 + scrollY * -0.05}px)`,
         }}
       />
       <div
-        className="absolute bottom-[-20%] left-[20%] w-[80%] h-[80%] opacity-35 blur-[130px] pointer-events-none"
+        className="absolute bottom-[-15%] left-[10%] w-[85%] h-[65%] opacity-45 blur-[120px] pointer-events-none"
         style={{
-          background: "radial-gradient(circle at center, rgba(14, 165, 233, 0.5) 0%, transparent 70%)", // Cyan
-          animation: "mesh-3 18s ease-in-out infinite",
-          transform: `translate(${moveX * 0.2}px, ${moveY * 0.2 + scrollY * 0.08}px)`,
+          background: "radial-gradient(ellipse at center, rgba(37, 99, 235, 0.5) 0%, transparent 75%)", // Royal Blue
+          animation: "mesh-3 20s ease-in-out infinite",
+          transform: `rotate(-10deg) translate(${moveX * 0.2}px, ${moveY * 0.2 + scrollY * 0.06}px)`,
         }}
       />
       <div
-        className="absolute bottom-[10%] right-[10%] w-[50%] h-[50%] opacity-30 blur-[90px] pointer-events-none"
+        className="absolute top-[30%] left-[20%] w-[60%] h-[40%] opacity-35 blur-[90px] pointer-events-none"
         style={{
-          background: "radial-gradient(circle at center, rgba(124, 58, 237, 0.45) 0%, transparent 70%)", // Violet
-          animation: "mesh-1 22s linear infinite reverse",
-          transform: `translate(${moveX * -0.4}px, ${moveY * 0.4 - scrollY * 0.02}px)`,
+          background: "radial-gradient(circle at center, rgba(16, 185, 129, 0.4) 0%, transparent 70%)", // Emerald Green Highlight
+          animation: "mesh-1 18s linear infinite reverse",
+          transform: `rotate(-25deg) translate(${moveX * -0.2}px, ${moveY * 0.2 - scrollY * 0.03}px)`,
         }}
       />
 
       {/* Surface Texture / Grain */}
-      <div className="absolute inset-0 opacity-[0.2] noise-filter mix-blend-overlay pointer-events-none"
+      <div className="absolute inset-0 opacity-[0.25] noise-filter mix-blend-overlay pointer-events-none"
         style={{ animation: 'grain-shift 0.8s steps(10) infinite' }} />
 
       {/* Subtle Grid Overlay */}
-      <div className="absolute inset-0 opacity-[0.05] bg-[linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] [background-size:100px_100px]" />
+      <div className="absolute inset-0 opacity-[0.03] bg-[linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] [background-size:120px_120px]" />
 
       {/* Interactive Cursor Glow */}
       <div
