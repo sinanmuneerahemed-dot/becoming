@@ -13,6 +13,7 @@
   writeBatch,
   serverTimestamp,
   Timestamp,
+  onSnapshot,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { normalizeEntryAnswers, type NormalizedAnswers } from "./entry-normalize";
@@ -333,6 +334,29 @@ export async function getActiveWeeklyAim(
       return bTs - aTs;
     })[0]!;
   return { id: d.id, ...d.data() } as WeeklyAim;
+}
+
+export function subscribeToActiveWeeklyAim(
+  uid: string,
+  callback: (aim: WeeklyAim | null) => void
+) {
+  const aimsRef = collection(db, "users", uid, "weeklyAims");
+  const q = query(aimsRef, where("status", "==", "active"));
+
+  return onSnapshot(q, (snap) => {
+    if (snap.empty) {
+      callback(null);
+      return;
+    }
+    const d = snap.docs
+      .slice()
+      .sort((a, b) => {
+        const aTs = (a.data().createdAt as Timestamp | null | undefined)?.toMillis?.() ?? 0;
+        const bTs = (b.data().createdAt as Timestamp | null | undefined)?.toMillis?.() ?? 0;
+        return bTs - aTs;
+      })[0]!;
+    callback({ id: d.id, ...d.data() } as WeeklyAim);
+  });
 }
 
 export async function completeWeeklyAim(

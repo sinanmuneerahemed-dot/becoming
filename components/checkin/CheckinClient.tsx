@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/providers/AuthProvider";
-import { getEntry, saveEntry, getLastNEntries, saveWeeklyAim, getActiveWeeklyAim, closeActiveWeeklyAims, completeWeeklyAim, updateWeeklyAimPlan } from "@/lib/firestore";
+import { getEntry, saveEntry, getLastNEntries, saveWeeklyAim, subscribeToActiveWeeklyAim, closeActiveWeeklyAims, completeWeeklyAim, updateWeeklyAimPlan } from "@/lib/firestore";
 import type { EntryAnswers, WeeklyAim } from "@/lib/firestore";
 import { CHECKIN_STEPS } from "@/lib/checkin-questions";
 import { GlassCard } from "@/components/ui/GlassCard";
@@ -74,16 +74,18 @@ export function CheckinClient({ step }: CheckinClientProps) {
   const currentStep = CHECKIN_STEPS[stepNum - 1]; // undefined if step === 9
   const currentValue = currentStep ? answers[currentStep.key] : undefined;
 
-  // Load active aim on mount
+  // Load active aim on mount (real-time)
   useEffect(() => {
     if (!user) return;
-    getActiveWeeklyAim(user.uid).then((aim) => {
-      setActiveAim(aim ?? null);
+    const unsubscribe = subscribeToActiveWeeklyAim(user.uid, (aim) => {
+      setActiveAim(aim);
       // If Day 7 has been reached and status is still active, trigger completion flow
       if (aim && getDayNumber(aim.startDate) >= 7 && stepNum === 1) {
         setShowCompletionFlow(true);
       }
     });
+
+    return () => unsubscribe();
   }, [user, stepNum]);
 
   const persistDraft = useCallback(
@@ -170,33 +172,28 @@ export function CheckinClient({ step }: CheckinClientProps) {
           ifYouMissDay: fallback.ifYouMissDay,
         });
 
-        // Step 2: Try AI generation — if it fails, fallback plan stays
-        try {
-          const normalized = await generateDirectionPlan(aimText, ctx);
-          const { planTitle, planRaw, days } = normalized;
-
-          await updateWeeklyAimPlan(user.uid, aimId, planRaw, planTitle, days, {
-            goalInterpretation: normalized.goalInterpretation,
-            strategicBreakdown: normalized.strategicBreakdown,
-            expectedOutcome: normalized.expectedOutcome,
-            riskAdvice: normalized.riskAdvice,
-            behavioralInsights: normalized.behavioralInsights,
-          });
-
-          toast.success("Your 7-Day Direction is set!");
-        } catch (aiErr) {
-          console.error("[Gemini] Plan generation failed, keeping fallback:", aiErr);
-          const msg = aiErr instanceof Error ? aiErr.message : "";
-          if (/429|rate|quota/i.test(msg)) {
-            toast.success("Aim saved with fallback. AI is rate-limited right now.");
-          } else if (/503|timeout|timed out/i.test(msg)) {
-            toast.success("Aim saved with fallback. AI is temporarily busy.");
-          } else {
-            toast.success("Aim saved! A basic plan has been set.");
-          }
-        }
-
+        // Step 2: Redirect immediately for better UX
         router.push("/app");
+        toast.success("Aim set! BECOMING is building your strategic plan...");
+
+        // Step 3: Trigger AI generation in the background
+        // We don't await this so the user isn't blocked.
+        generateDirectionPlan(aimText, ctx)
+          .then(async (normalized) => {
+            await updateWeeklyAimPlan(user.uid, aimId, normalized.planRaw, normalized.planTitle, normalized.days, {
+              goalInterpretation: normalized.goalInterpretation,
+              strategicBreakdown: normalized.strategicBreakdown,
+              expectedOutcome: normalized.expectedOutcome,
+              riskAdvice: normalized.riskAdvice,
+              behavioralInsights: normalized.behavioralInsights,
+            });
+            // Optional: toast.success("AI Plan ready!"); 
+            // Better to just let the dashboard update live via listener.
+          })
+          .catch((aiErr) => {
+            console.error("[Gemini] Background generation failed:", aiErr);
+            // Fallback plan is already in place, so we just log the failure.
+          });
       } catch (err) {
         console.error("Aim save failed:", err);
         toast.error("Failed to save aim. Try again.");

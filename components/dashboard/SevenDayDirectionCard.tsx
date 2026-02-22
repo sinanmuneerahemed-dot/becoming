@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/providers/AuthProvider";
-import { getActiveWeeklyAim } from "@/lib/firestore";
+import { subscribeToActiveWeeklyAim } from "@/lib/firestore";
 import type { WeeklyAim } from "@/lib/firestore";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { FullPlanModal } from "./FullPlanModal";
@@ -23,9 +23,13 @@ export function SevenDayDirectionCard() {
 
     useEffect(() => {
         if (!user) return;
-        getActiveWeeklyAim(user.uid)
-            .then((a) => setAim(a ?? null))
-            .catch(() => setAim(null));
+
+        // Listen to active weekly aim in real-time
+        const unsubscribe = subscribeToActiveWeeklyAim(user.uid, (data) => {
+            setAim(data);
+        });
+
+        return () => unsubscribe();
     }, [user]);
 
     // Loading
