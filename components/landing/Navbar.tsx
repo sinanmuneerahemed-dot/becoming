@@ -20,8 +20,7 @@ export function Navbar() {
     <nav className="sticky top-0 z-50 backdrop-blur-md border-b border-white/10 bg-midnight/80">
       <div className="max-w-6xl mx-auto px-4 py-3 sm:py-4 flex items-center justify-between gap-4">
         <Link href="/" className="flex items-center gap-2 shrink-0">
-          <img src="/logo.png" alt="Becoming" className="h-8 sm:h-9 w-auto" />
-          <span className="text-lg sm:text-xl font-bold tracking-wider hidden sm:inline">BECOMING</span>
+          <span className="text-lg sm:text-xl font-bold tracking-wider">BECOMING</span>
         </Link>
         <div className="hidden md:flex items-center gap-4 lg:gap-6">
           {NAV_LINKS.map(({ href, label }) => (

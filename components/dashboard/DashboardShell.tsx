@@ -30,7 +30,7 @@ export function DashboardShell() {
         <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-10 sm:mb-12">
           <div className="min-w-0 flex items-center gap-3">
             <Link href="/">
-              <img src="/logo.png" alt="Becoming" className="h-8 w-auto" />
+              <div className="w-1.5 h-8 bg-neon-cyan/50 rounded-full" /> {/* Minimalist Accent */}
             </Link>
             <div>
               <h1 className="text-xl sm:text-2xl font-bold truncate">Dashboard</h1>
