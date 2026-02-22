@@ -9,7 +9,7 @@ export function GlassCard({ children, className }: GlassCardProps) {
   return (
     <div
       className={clsx(
-        "rounded-xl border border-white/10 bg-white/5 backdrop-blur-md",
+        "rounded-xl border border-white/12 bg-white/6 backdrop-blur-[20px] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]",
         className
       )}
     >

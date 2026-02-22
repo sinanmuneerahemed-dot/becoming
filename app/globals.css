@@ -7,8 +7,26 @@
     @apply scroll-smooth;
   }
   body {
-    @apply bg-midnight text-white antialiased;
+    background-color: #0b0f1a;
+    @apply text-white antialiased;
   }
+}
+
+@keyframes aurora-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(10%, 15%) scale(1.1); }
+  66% { transform: translate(-5%, 10%) scale(0.9); }
+}
+
+@keyframes aurora-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(-15%, -10%) scale(0.95); }
+  66% { transform: translate(10%, -5%) scale(1.05); }
+}
+
+@keyframes aurora-3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(5%, -15%) scale(1.1); }
 }
 
 @media (prefers-reduced-motion: reduce) {
