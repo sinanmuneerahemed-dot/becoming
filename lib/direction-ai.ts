@@ -796,6 +796,15 @@ function buildFallbackCore(aimText: string): NormalizedPlan {
             day7: `Compare Day 1 baseline vs Day 7 results for ${primaryTheme}. Keep one winning pattern and remove one recurring blocker.`,
         },
         ifYouMissDay: "Do not restart the full week. Run one 30-minute recovery block tomorrow, complete the most critical pending action, then continue with the next plan day.",
+        goalInterpretation: `This aim requires a structured 7-day sprint to establish a baseline and build momentum. Success means completing the daily targets and maintaining consistent focus.`,
+        strategicBreakdown: `The core strategy is to remove friction and focus on high-impact actions. The primary risk is loss of momentum mid-week; use the Day 3 checkpoint to stay aligned.`,
+        expectedOutcome: `By Day 7, you will have established a clear execution rhythm and delivered measurable progress toward your aim.`,
+        riskAdvice: `If you feel overwhelmed, reduce the complexity of individual tasks but keep the timing of your focus blocks. Avoid digital distractions during deep work.`,
+        behavioralInsights: [
+            "Consistent action builds a new self-identity faster than motivation.",
+            "Energy follows action; do not wait to feel ready.",
+            "Measurement is the antidote to uncertainty."
+        ],
     };
 }
 
