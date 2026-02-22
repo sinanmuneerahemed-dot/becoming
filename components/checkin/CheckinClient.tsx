@@ -134,8 +134,13 @@ export function CheckinClient({ step }: CheckinClientProps) {
       setSaving(true);
       try {
         await saveEntry(user.uid, getTodayDateStr(), merged, true);
-        // Navigate to step 9
-        router.push(`/checkin/9`);
+        // Step 9 is conditional: only if no active aim exists
+        if (activeAim) {
+          router.push("/app");
+          toast.success("Check-in complete!");
+        } else {
+          router.push("/checkin/9");
+        }
       } catch (err) {
         toast.error("Failed to save. Try again.");
         setSaving(false);

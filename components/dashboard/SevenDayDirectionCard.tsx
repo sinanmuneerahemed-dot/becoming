@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/providers/AuthProvider";
-import { subscribeToActiveWeeklyAim } from "@/lib/firestore";
-import type { WeeklyAim } from "@/lib/firestore";
+import { subscribeToActiveWeeklyAim, closeActiveWeeklyAims } from "@/lib/firestore";
+import type { WeeklyAim, DayPlan } from "@/lib/firestore";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { FullPlanModal } from "./FullPlanModal";
 
@@ -17,9 +18,25 @@ function getDayNumber(startDate: string): number {
 }
 
 export function SevenDayDirectionCard() {
+    const router = useRouter();
     const { user } = useAuth();
     const [aim, setAim] = useState<WeeklyAim | null | undefined>(undefined);
     const [showModal, setShowModal] = useState(false);
+    const [isChanging, setIsChanging] = useState(false);
+
+    const handleChangeAim = async () => {
+        if (!user || isChanging) return;
+        if (window.confirm("Are you sure you want to change your aim? This will close your current 7-day plan.")) {
+            setIsChanging(true);
+            try {
+                await closeActiveWeeklyAims(user.uid);
+                router.push("/checkin/9");
+            } catch (err) {
+                console.error("Failed to change aim:", err);
+                setIsChanging(false);
+            }
+        }
+    };
 
     useEffect(() => {
         if (!user) return;
@@ -45,7 +62,7 @@ export function SevenDayDirectionCard() {
     if (!aim) return null;
 
     const currentDay = getDayNumber(aim.startDate);
-    const todayPlan = aim.days?.find((d) => d.day === currentDay);
+    const todayPlan = aim.days?.find((d: DayPlan) => d.day === currentDay);
     const progress = `${currentDay}/7`;
 
     return (
@@ -84,7 +101,7 @@ export function SevenDayDirectionCard() {
                             Today — {todayPlan.focus}
                         </p>
                         <ul className="space-y-1.5">
-                            {todayPlan.tasks.slice(0, 3).map((task, i) => (
+                            {todayPlan.tasks.slice(0, 3).map((task: string, i: number) => (
                                 <li key={i} className="flex gap-2 text-sm text-white/80">
                                     <span className="text-neon-cyan/60 shrink-0 mt-0.5">›</span>
                                     <span>{task}</span>
@@ -99,13 +116,22 @@ export function SevenDayDirectionCard() {
                     <p className="text-white/40 text-sm">No plan data for today.</p>
                 )}
 
-                {/* View Full Plan */}
-                <button
-                    onClick={() => setShowModal(true)}
-                    className="text-neon-cyan text-sm hover:underline text-left"
-                >
-                    View Full Plan →
-                </button>
+                {/* Actions */}
+                <div className="flex items-center gap-4 pt-2">
+                    <button
+                        onClick={() => setShowModal(true)}
+                        className="text-neon-cyan text-sm hover:underline"
+                    >
+                        View Full Plan →
+                    </button>
+                    <button
+                        onClick={handleChangeAim}
+                        disabled={isChanging}
+                        className="text-white/30 text-[10px] uppercase tracking-wider hover:text-white/60 transition-colors"
+                    >
+                        {isChanging ? "Closing..." : "Change Aim"}
+                    </button>
+                </div>
             </GlassCard>
 
             {showModal && (
