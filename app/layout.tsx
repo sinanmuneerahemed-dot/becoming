@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/providers/AuthProvider";
 
+import NotificationManager from "@/components/NotificationManager";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -38,6 +39,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="relative min-h-screen overflow-x-hidden">
         <AuthProvider>
+          <NotificationManager />
 
           <main className="relative z-10">{children}</main>
           <Toaster
