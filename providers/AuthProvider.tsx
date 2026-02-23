@@ -9,7 +9,14 @@ import {
   ReactNode,
 } from "react";
 import type { User } from "firebase/auth";
-import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut as firebaseSignOut } from "firebase/auth";
+import {
+  onAuthStateChanged,
+  signInWithPopup,
+  GoogleAuthProvider,
+  signOut as firebaseSignOut,
+  setPersistence,
+  browserLocalPersistence
+} from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { getOrCreateUser } from "@/lib/firestore";
 
@@ -29,6 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogle = useCallback(async () => {
     try {
       const provider = new GoogleAuthProvider();
+      await setPersistence(auth, browserLocalPersistence);
       await signInWithPopup(auth, provider);
     } catch (error) {
       console.error("Sign-in error:", error);

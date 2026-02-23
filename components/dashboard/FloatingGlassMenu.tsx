@@ -62,18 +62,6 @@ export function FloatingGlassMenu({ activeTab, onTabChange, tabs }: FloatingGlas
                             )}>
                                 {tab.label}
                             </span>
-
-                            {isActive && (
-                                <motion.div
-                                    layoutId="active-dot"
-                                    className="absolute bottom-1 w-5 h-1 rounded-full shadow-lg"
-                                    style={{
-                                        backgroundColor: config.color,
-                                        boxShadow: `0 0 10px ${config.color}`
-                                    }}
-                                    transition={{ type: "spring", duration: 0.25 }}
-                                />
-                            )}
                         </button>
                     );
                 })}
